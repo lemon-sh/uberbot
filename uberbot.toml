@@ -1,0 +1,5 @@
+nickname = "uberbot"
+server = "karx.xyz"
+use_tls = true
+channels = ["#main"]
+umodes = "+B"

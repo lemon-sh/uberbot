@@ -10,3 +10,5 @@ anyhow = "1"
 futures = "0"
 tracing = "0"
 tracing-subscriber = { version = "0", features = ["env-filter"] }
+reqwest = "0"
+serde_json = "1"
