@@ -6,17 +6,16 @@ use irc::{
     proto::{Command, Message, Prefix},
 };
 use rspotify::Credentials;
-use titlebot::Titlebot;
+use bots::title::Titlebot;
+use bots::weeb;
 use tokio::select;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 
-mod waifu;
-mod titlebot;
+mod bots;
 
 const HELP: &str = concat!(
-    "a",
-    "b"
+    "=- \x1d\x02Ü\x02berbot\x0f ", env!("CARGO_PKG_VERSION"), " -="
 );
 
 #[cfg(unix)]
@@ -150,7 +149,7 @@ async fn handle_privmsg(
         }
         "waifu" => {
             let category = remainder.unwrap_or("waifu");
-            let url = waifu::get_waifu_pic(category).await?;
+            let url = weeb::get_waifu_pic(category).await?;
             let response = url.as_ref().map(|v| v.as_str())
                 .unwrap_or("Invalid category. Valid categories: https://waifu.pics/docs");
             state.client.send_privmsg(target, response)?;

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-irc = "0.15"
+irc = "0"
 tokio = { version = "1", features = ["rt", "macros", "signal"] }
 anyhow = "1"
 futures = "0"

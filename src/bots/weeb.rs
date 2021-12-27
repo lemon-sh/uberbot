@@ -9,3 +9,5 @@ pub async fn get_waifu_pic(category: &str) -> anyhow::Result<Option<String>> {
     let url = value["url"].as_str().map(|v| v.to_string());
     Ok(url)
 }
+
+// TODO: add owofier
