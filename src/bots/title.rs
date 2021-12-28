@@ -123,7 +123,6 @@ impl Titlebot {
                 }
             }
             let body = response.text().await?;
-            tracing::debug!("body: {}", body);
             if let Some(tm) = self.title_regex.find(&body)? {
                 let title_match = &body[tm.start()..tm.end()];
                 let result = decode_html(title_match).unwrap_or_else(|_| title_match.to_string());
