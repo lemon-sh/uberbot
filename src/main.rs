@@ -61,11 +61,11 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::from_env("UBERBOT_LOG"))
         .init();
 
-    let mut file = File::open("uberbot.toml").unwrap();
+    let mut file = File::open("uberbot.toml")?;
     let mut client_conf = String::new();
-    file.read_to_string(&mut client_conf).unwrap();
+    file.read_to_string(&mut client_conf)?;
 
-    let client_config: ClientConf = toml::from_str(&client_conf).unwrap();
+    let client_config: ClientConf = toml::from_str(&client_conf)?;
 
     let spotify_creds = Credentials::new(
         &client_config.spotify_client_id,
