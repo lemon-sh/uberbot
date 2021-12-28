@@ -1,5 +1,13 @@
-nickname = "uberbot"
-server = "karx.xyz"
-use_tls = true
-channels = ["#main"]
-umodes = "+B"
+# IRC config
+host = "karx.xyz"
+port = 6697
+username = "uberbot"
+channels = ["#main, #no-normies"]
+mode = "+B"
+
+# Spotify config
+spotify_client_id = ""
+spotify_client_secret = ""
+
+# Bot config
+prefix = "!"

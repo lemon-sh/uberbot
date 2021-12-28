@@ -1,21 +1,20 @@
-use std::{env, collections::HashMap};
-
-use futures::stream::StreamExt;
-use irc::{
-    client::{prelude::Config, Client, ClientStream},
-    proto::{Command, Message, Prefix},
-};
-use rspotify::Credentials;
+use async_circe::{commands::Command, Client, Config};
 use bots::title::Titlebot;
 use bots::weeb;
+use rspotify::Credentials;
+use serde::Deserialize;
+use std::fs::File;
+use std::io::Read;
+use std::{collections::HashMap, env};
 use tokio::select;
-use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 mod bots;
 
 const HELP: &str = concat!(
-    "=- \x1d\x02Ü\x02berbot\x0f ", env!("CARGO_PKG_VERSION"), " -="
+    "=- \x1d\x02Ü\x02berbot\x0f ",
+    env!("CARGO_PKG_VERSION"),
+    " -="
 );
 
 #[cfg(unix)]
@@ -24,8 +23,8 @@ async fn terminate_signal() {
     let mut sigterm = signal(SignalKind::terminate()).unwrap();
     let mut sigint = signal(SignalKind::interrupt()).unwrap();
     select! {
-        _ = sigterm.recv() => break,
-        _ = sigint.recv() => break
+        _ = sigterm.recv() => return,
+        _ = sigint.recv() => return
     }
 }
 
@@ -40,7 +39,20 @@ struct AppState {
     prefix: String,
     client: Client,
     last_msgs: HashMap<String, String>,
-    titlebot: Titlebot
+    titlebot: Titlebot,
+}
+
+#[derive(Deserialize)]
+struct ClientConf {
+    channels: Vec<String>,
+    host: String,
+    mode: Option<String>,
+    nickname: Option<String>,
+    port: u16,
+    username: String,
+    spotify_client_id: String,
+    spotify_client_secret: String,
+    prefix: String,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -48,72 +60,71 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_env("UBERBOT_LOG"))
         .init();
-    let mut config =
-        Config::load(env::var("UBERBOT_CONFIG").unwrap_or_else(|_| "uberbot.toml".to_owned()))?;
-    let prefix = config.options.remove("prefix").unwrap_or("!".into());
-    let spotify_cred_options = (config.options.remove("spotify_client_id"), config.options.remove("spotify_client_secret"));
-    let spotify_creds = if let (Some(id), Some(sec)) = spotify_cred_options {
-        Credentials::new(id.as_str(), sec.as_str())
-    } else {
-        return Err(anyhow::anyhow!("Config doesn't contain Spotify credentials."))
-    };
 
-    let mut client = Client::from_config(config).await?;
-    client.identify()?;
-    let stream = client.stream()?;
+    let mut file = File::open("uberbot.toml").unwrap();
+    let mut client_conf = String::new();
+    file.read_to_string(&mut client_conf).unwrap();
+
+    let client_config: ClientConf = toml::from_str(&client_conf).unwrap();
+
+    let spotify_creds = Credentials::new(
+        &client_config.spotify_client_id,
+        &client_config.spotify_client_secret,
+    );
+
+    let config = Config::runtime_config(
+        client_config.channels,
+        client_config.host,
+        client_config.mode,
+        client_config.nickname,
+        client_config.port,
+        client_config.username,
+    );
+    let mut client = Client::new(config).await?;
+    client.identify().await?;
 
     let state = AppState {
-        prefix, client,
+        prefix: client_config.prefix,
+        client,
         last_msgs: HashMap::new(),
-        titlebot: Titlebot::create(spotify_creds).await?
+        titlebot: Titlebot::create(spotify_creds).await?,
     };
 
-    if let Err(e) = message_loop(stream, state).await {
-        error!("Error in message loop: {}", e);
+    if let Err(e) = message_loop(state).await {
+        tracing::error!("Error in message loop: {}", e);
     }
 
-    info!("Shutting down");
+    tracing::info!("Shutting down");
 
     Ok(())
 }
 
-async fn message_loop(
-    mut stream: ClientStream,
-    mut state: AppState
-) -> anyhow::Result<()> {
+async fn message_loop(mut state: AppState) -> anyhow::Result<()> {
     loop {
         select! {
-            r = stream.next() => {
-                if let Some(message) = r.transpose()? {
-                    debug!("{}", message.to_string().trim_end());
-
-                    if let Err(e) = handle_message(&mut state, message).await {
-                        warn!("Error in message handler: {}", e);
-                    }
-                } else {
-                    break
+            r = state.client.read() => {
+                if let Ok(command) = r {
+                    handle_message(&mut state, command).await?;
                 }
             },
             _ = terminate_signal() => {
-                info!("Sending QUIT message");
-                state.client.send_quit("überbot shutting down")?;
+                tracing::info!("Sending QUIT message");
+                state.client.quit(Some("überbot shutting down")).await?;
+                break;
             }
         }
     }
     Ok(())
 }
 
-async fn handle_message(state: &mut AppState, msg: Message) -> anyhow::Result<()> {
+async fn handle_message(state: &mut AppState, command: Command) -> anyhow::Result<()> {
     // change this to a match when more commands are handled
-    if let Command::PRIVMSG(target, content) = &msg.command {
-        let target = msg.response_target().unwrap_or(target);
-        let author = if let Some(Prefix::Nickname(ref nick, _, _)) = msg.prefix {
-            Some(nick.as_str())
-        } else {
-            None
-        };
-        if let Err(e) = handle_privmsg(state, author, target, content).await {
-            state.client.send_privmsg(target, format!("Error: {}", e))?;
+    if let Command::PRIVMSG(nick, channel, message) = command {
+        if let Err(e) = handle_privmsg(state, nick, &channel, message).await {
+            state
+                .client
+                .privmsg(&channel, &format!("Error: {}", e))
+                .await?;
         }
     }
     Ok(())
@@ -121,41 +132,41 @@ async fn handle_message(state: &mut AppState, msg: Message) -> anyhow::Result<()
 
 async fn handle_privmsg(
     state: &mut AppState,
-    author: Option<&str>,
-    target: &str,
-    content: &String
+    nick: String,
+    channel: &str,
+    message: String,
 ) -> anyhow::Result<()> {
-    if !content.starts_with(state.prefix.as_str()) {
-        if let Some(author) = author {
-            state.last_msgs.insert(author.to_string(), content.clone());
-        }
-        if let Some(titlebot_msg) = state.titlebot.resolve(content).await? {
-            state.client.send_privmsg(target, titlebot_msg)?;
+    if !message.starts_with(state.prefix.as_str()) {
+        state.last_msgs.insert(nick, message.clone());
+
+        if let Some(titlebot_msg) = state.titlebot.resolve(&message).await? {
+            state.client.privmsg(&channel, &titlebot_msg).await?;
         }
         return Ok(());
     }
-    let content = content.trim();
-    let space_index = content.find(' ');
+    let space_index = message.find(' ');
     let (command, remainder) = if let Some(o) = space_index {
-        (&content[state.prefix.len()..o], Some(&content[o + 1..]))
+        (&message[state.prefix.len()..o], Some(&message[o + 1..]))
     } else {
-        (&content[state.prefix.len()..], None)
+        (&message[state.prefix.len()..], None)
     };
-    debug!("Command received ({}; {:?})", command, remainder);
+    tracing::debug!("Command received ({}; {:?})", command, remainder);
 
     match command {
         "help" => {
-            state.client.send_privmsg(target, HELP)?;
+            state.client.privmsg(&channel, HELP).await?;
         }
         "waifu" => {
             let category = remainder.unwrap_or("waifu");
             let url = weeb::get_waifu_pic(category).await?;
-            let response = url.as_ref().map(|v| v.as_str())
+            let response = url
+                .as_ref()
+                .map(|v| v.as_str())
                 .unwrap_or("Invalid category. Valid categories: https://waifu.pics/docs");
-            state.client.send_privmsg(target, response)?;
+            state.client.privmsg(&channel, response).await?;
         }
         _ => {
-            state.client.send_privmsg(target, "Unknown command")?;
+            state.client.privmsg(&channel, "Unknown command").await?;
         }
     }
     Ok(())
