@@ -1,0 +1,3 @@
+[submodule "async-circe"]
+	path = async-circe
+	url = ssh://gitea@git.karx.xyz:1604/circe/async-circe.git
