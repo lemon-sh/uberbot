@@ -15,6 +15,5 @@ rspotify = "0.11"
 htmlescape = "0.3"
 toml = "0.5"
 serde = "1.0"
+async-circe = "0.1.1"
 
-[dependencies.async-circe]
-path = "async-circe/"
