@@ -27,6 +27,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "84450d0b4a8bd1ba4144ce8ce718fbc5d071358b1e5384bace6536b3d1f2d5b3"
 
 [[package]]
+name = "arrayvec"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
+
+[[package]]
 name = "async-circe"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1343,9 +1349,11 @@ name = "uberbot"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arrayvec",
  "async-circe",
  "fancy-regex",
  "htmlescape",
+ "rand",
  "reqwest",
  "rspotify",
  "serde",
