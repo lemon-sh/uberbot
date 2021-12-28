@@ -31,10 +31,7 @@ name = "async-circe"
 version = "0.1.5"
 dependencies = [
  "async-native-tls",
- "serde",
- "serde_derive",
  "tokio",
- "toml",
 ]
 
 [[package]]
