@@ -44,7 +44,13 @@ struct AppState {
 }
 
 #[derive(Deserialize)]
-struct SpotifyConf {
+struct ClientConf {
+    channels: Vec<String>,
+    host: String,
+    mode: Option<String>,
+    nickname: Option<String>,
+    port: u16,
+    username: String,
     spotify_client_id: String,
     spotify_client_secret: String,
 }
@@ -55,16 +61,22 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::from_env("UBERBOT_LOG"))
         .init();
 
-    let mut file = File::open("uberbot_spotify.toml").unwrap();
-    let mut spotify_conf = String::new();
-    file.read_to_string(&mut spotify_conf).unwrap();
+    let mut file = File::open("uberbot.toml").unwrap();
+    let mut client_conf = String::new();
+    file.read_to_string(&mut client_conf).unwrap();
 
-    let spotify: SpotifyConf = toml::from_str(&spotify_conf).unwrap();
+    let config: ClientConf = toml::from_str(&client_conf).unwrap();
 
-    let spotify_creds =
-        Credentials::new(&spotify.spotify_client_id, &spotify.spotify_client_secret);
+    let spotify_creds = Credentials::new(&config.spotify_client_id, &config.spotify_client_secret);
 
-    let config = Config::from_toml("uberbot_irc.toml")?;
+    let config = Config::runtime_config(
+        config.channels,
+        config.host,
+        config.mode,
+        config.nickname,
+        config.port,
+        config.username,
+    );
     let mut client = Client::new(config).await?;
     client.identify().await?;
 
