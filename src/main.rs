@@ -91,7 +91,9 @@ async fn main() -> anyhow::Result<()> {
         titlebot: Titlebot::create(spotify_creds).await?,
     };
 
-    message_loop(state).await?;
+    if let Err(e) = message_loop(state).await {
+        error!("Error in message loop: {}", e);
+    }
 
     info!("Shutting down");
 
