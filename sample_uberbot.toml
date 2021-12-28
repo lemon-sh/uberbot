@@ -8,3 +8,6 @@ mode = "+B"
 # Spotify config
 spotify_client_id = ""
 spotify_client_secret = ""
+
+# Bot config
+prefix = "!"

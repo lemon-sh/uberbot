@@ -53,6 +53,7 @@ struct ClientConf {
     username: String,
     spotify_client_id: String,
     spotify_client_secret: String,
+    prefix: String,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -65,23 +66,26 @@ async fn main() -> anyhow::Result<()> {
     let mut client_conf = String::new();
     file.read_to_string(&mut client_conf).unwrap();
 
-    let config: ClientConf = toml::from_str(&client_conf).unwrap();
+    let client_config: ClientConf = toml::from_str(&client_conf).unwrap();
 
-    let spotify_creds = Credentials::new(&config.spotify_client_id, &config.spotify_client_secret);
+    let spotify_creds = Credentials::new(
+        &client_config.spotify_client_id,
+        &client_config.spotify_client_secret,
+    );
 
     let config = Config::runtime_config(
-        config.channels,
-        config.host,
-        config.mode,
-        config.nickname,
-        config.port,
-        config.username,
+        client_config.channels,
+        client_config.host,
+        client_config.mode,
+        client_config.nickname,
+        client_config.port,
+        client_config.username,
     );
     let mut client = Client::new(config).await?;
     client.identify().await?;
 
     let state = AppState {
-        prefix: "!".to_string(),
+        prefix: client_config.prefix,
         client,
         last_msgs: HashMap::new(),
         titlebot: Titlebot::create(spotify_creds).await?,
