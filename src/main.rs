@@ -7,7 +7,6 @@ use std::fs::File;
 use std::io::Read;
 use std::{collections::HashMap, env};
 use tokio::select;
-use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 mod bots;
@@ -92,10 +91,10 @@ async fn main() -> anyhow::Result<()> {
     };
 
     if let Err(e) = message_loop(state).await {
-        error!("Error in message loop: {}", e);
+        tracing::error!("Error in message loop: {}", e);
     }
 
-    info!("Shutting down");
+    tracing::info!("Shutting down");
 
     Ok(())
 }
@@ -109,7 +108,7 @@ async fn message_loop(mut state: AppState) -> anyhow::Result<()> {
                 }
             },
             _ = terminate_signal() => {
-                info!("Sending QUIT message");
+                tracing::info!("Sending QUIT message");
                 state.client.quit(Some("überbot shutting down")).await?;
                 break;
             }
@@ -121,8 +120,6 @@ async fn message_loop(mut state: AppState) -> anyhow::Result<()> {
 async fn handle_message(state: &mut AppState, command: Command) -> anyhow::Result<()> {
     // change this to a match when more commands are handled
     if let Command::PRIVMSG(nick, channel, message) = command {
-        debug!("{}: {}", channel, message);
-
         if let Err(e) = handle_privmsg(state, nick, &channel, message).await {
             state
                 .client
@@ -143,7 +140,6 @@ async fn handle_privmsg(
         state.last_msgs.insert(nick, message.clone());
 
         if let Some(titlebot_msg) = state.titlebot.resolve(&message).await? {
-            debug!("{}", titlebot_msg);
             state.client.privmsg(&channel, &titlebot_msg).await?;
         }
         return Ok(());
@@ -154,7 +150,7 @@ async fn handle_privmsg(
     } else {
         (&message[state.prefix.len()..], None)
     };
-    debug!("Command received ({}; {:?})", command, remainder);
+    tracing::debug!("Command received ({}; {:?})", command, remainder);
 
     match command {
         "help" => {
