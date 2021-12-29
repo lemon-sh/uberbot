@@ -193,7 +193,6 @@ async fn handle_privmsg(
                 None => &nick,
             }
             .trim();
-            tracing::info!(user);
             if let Some(prev_msg) = state.last_msgs.get(user) {
                 let resp = bots::leek::leetify(prev_msg);
                 state.client.privmsg(&channel, &resp).await?;
