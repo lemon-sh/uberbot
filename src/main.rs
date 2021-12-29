@@ -165,6 +165,21 @@ async fn handle_privmsg(
                 .unwrap_or("Invalid category. Valid categories: https://waifu.pics/docs");
             state.client.privmsg(&channel, response).await?;
         }
+        "mock" => {
+            let user = match remainder {
+                Some(u) => match u {
+                    "" => &nick,
+                    _ => u
+                },
+                None => &nick
+            }.trim();
+            if let Some(prev_msg) = state.last_msgs.get(user) {
+                let resp = bots::leek::mock(prev_msg);
+                state.client.privmsg(&channel, &resp).await?;
+            } else {
+                state.client.privmsg(&channel, "No previous messages to mock!").await?;
+            }
+        }
         "leet" => {
             let user = match remainder {
                 Some(u) => match u {

@@ -1,5 +1,3 @@
-// TODO: port leek @karx
-
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
         let mut map = ::std::collections::HashMap::new();
@@ -8,21 +6,20 @@ macro_rules! hashmap {
     }}
 }
 
-// macro_rules! mock {
-//     ($target:expr) => {{
-//         let mut builder = String::from("");
 
-//         for char in $target.chars() {
-//             if rand::random() {
-//                 builder.push_str(&char.to_uppercase().to_string());
-//             } else {
-//                 builder.push_str(&char.to_lowercase().to_string());
-//             }
-//         }
+pub fn mock(target: &str) -> String {
+    let mut builder = String::with_capacity(target.len());
 
-//         builder
-//     }}
-// }
+    for char in target.chars() {
+        if rand::random() {
+            builder.push_str(&char.to_uppercase().to_string());
+        } else {
+            builder.push_str(&char.to_lowercase().to_string());
+        }
+    }
+
+    builder
+}
 
 pub fn leetify(target: &str) -> String {
     let letters = hashmap! {
