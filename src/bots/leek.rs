@@ -6,7 +6,6 @@ macro_rules! hashmap {
     }}
 }
 
-
 pub fn mock(target: &str) -> String {
     let mut builder = String::with_capacity(target.len());
 

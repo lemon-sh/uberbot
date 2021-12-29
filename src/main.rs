@@ -169,31 +169,39 @@ async fn handle_privmsg(
             let user = match remainder {
                 Some(u) => match u {
                     "" => &nick,
-                    _ => u
+                    _ => u,
                 },
-                None => &nick
-            }.trim();
+                None => &nick,
+            }
+            .trim();
             if let Some(prev_msg) = state.last_msgs.get(user) {
                 let resp = bots::leek::mock(prev_msg);
                 state.client.privmsg(&channel, &resp).await?;
             } else {
-                state.client.privmsg(&channel, "No previous messages to mock!").await?;
+                state
+                    .client
+                    .privmsg(&channel, "No previous messages to mock!")
+                    .await?;
             }
         }
         "leet" => {
             let user = match remainder {
                 Some(u) => match u {
                     "" => &nick,
-                    _ => u
+                    _ => u,
                 },
-                None => &nick
-            }.trim();
+                None => &nick,
+            }
+            .trim();
             tracing::info!(user);
             if let Some(prev_msg) = state.last_msgs.get(user) {
                 let resp = bots::leek::leetify(prev_msg);
                 state.client.privmsg(&channel, &resp).await?;
             } else {
-                state.client.privmsg(&channel, "No previous messages to leetify!").await?;
+                state
+                    .client
+                    .privmsg(&channel, "No previous messages to leetify!")
+                    .await?;
             }
         }
         _ => {
