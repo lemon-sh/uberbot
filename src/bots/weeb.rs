@@ -1,8 +1,8 @@
 use arrayvec::{ArrayString, CapacityError};
 use rand::Rng;
 use serde_json::Value;
-use tracing::debug;
 use std::result::Result;
+use tracing::debug;
 
 pub async fn get_waifu_pic(category: &str) -> anyhow::Result<Option<String>> {
     let api_resp = reqwest::get(format!("https://api.waifu.pics/sfw/{}", category))
@@ -24,19 +24,22 @@ impl<T> From<CapacityError<T>> for OwoCapacityError {
     }
 }
 
-pub fn owoify_out_of_place(input: &str, output: &mut ArrayString<512>) -> Result<(), OwoCapacityError> {
+pub fn owoify_out_of_place(
+    input: &str,
+    output: &mut ArrayString<512>,
+) -> Result<(), OwoCapacityError> {
     let input: ArrayString<512> = ArrayString::from(input)?;
     let mut rng = rand::thread_rng();
     let mut last_char = '\0';
     for byte in input.bytes() {
         let mut ch = char::from(byte);
         if !ch.is_ascii() {
-            continue
+            continue;
         }
         // owoify character
         ch = match ch.to_ascii_lowercase() {
             'r' | 'l' => 'w',
-            _ => ch
+            _ => ch,
         };
         // stutter (e.g. "o-ohayou gozaimasu!")
         if last_char == ' ' && rng.gen_bool(0.2) {
@@ -47,7 +50,7 @@ pub fn owoify_out_of_place(input: &str, output: &mut ArrayString<512>) -> Result
             // nya-ify
             'a' | 'e' | 'i' | 'o' | 'u' if last_char == 'n' => {
                 output.try_push('y')?;
-            },
+            }
             // textmoji
             '.' => {
                 output.try_push_str(match rng.gen_range(0..6) {
