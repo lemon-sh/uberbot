@@ -3,6 +3,9 @@ name = "uberbot"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+lto = true
+
 [dependencies]
 tokio = { version = "1.15", features = ["rt", "macros", "signal"] }
 anyhow = "1.0"
@@ -17,4 +20,4 @@ toml = "0.5"
 serde = "1.0"
 arrayvec = "0.7"
 rand = "0.8"
-async-circe = "0.1.1"
+async-circe = { git = "https://git.karx.xyz/circe/async-circe" }

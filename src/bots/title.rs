@@ -3,7 +3,6 @@ use htmlescape::decode_html;
 use rspotify::clients::BaseClient;
 use rspotify::model::PlayableItem;
 use rspotify::{model::Id, ClientCredsSpotify, Credentials};
-use tracing::debug;
 
 fn calculate_playtime(secs: u64) -> (u64, u64) {
     let mut dur_sec = secs;
@@ -22,7 +21,7 @@ async fn resolve_spotify(
     // if spotify.token.lock().await.unwrap().as_ref().unwrap().is_expired() {
     //     spotify.request_token().await?;
     // }
-    debug!(
+    tracing::debug!(
         "Resolving Spotify resource '{}' with id '{}'",
         resource_type, resource_id
     );

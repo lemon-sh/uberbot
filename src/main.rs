@@ -1,6 +1,6 @@
 use async_circe::{commands::Command, Client, Config};
 use bots::title::Titlebot;
-use bots::weeb;
+use bots::{weeb, leek};
 use rspotify::Credentials;
 use serde::Deserialize;
 use std::fs::File;
@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::from_env("UBERBOT_LOG"))
         .init();
 
-    let mut file = File::open("uberbot.toml")?;
+    let mut file = File::open(env::var("UBERBOT_CONFIG").unwrap_or_else(|_| "uberbot.toml".to_string()))?;
     let mut client_conf = String::new();
     file.read_to_string(&mut client_conf)?;
 
@@ -80,7 +80,9 @@ async fn main() -> anyhow::Result<()> {
         client_config.port,
         client_config.username,
     );
+    tracing::debug!("Creating circe client");
     let mut client = Client::new(config).await?;
+    tracing::debug!("Identifying with IRC");
     client.identify().await?;
 
     let state = AppState {
@@ -130,6 +132,26 @@ async fn handle_message(state: &mut AppState, command: Command) -> anyhow::Resul
     Ok(())
 }
 
+enum LeekCommand {
+    Owo, Leet, Mock
+}
+async fn execute_leek(state: &mut AppState, cmd: LeekCommand, channel: &str, nick: &str) -> anyhow::Result<()> {
+    match state.last_msgs.get(nick) {
+        Some(msg) => {
+            let output = match cmd {
+                LeekCommand::Owo => leek::owoify(msg)?,
+                LeekCommand::Leet => leek::leetify(msg)?,
+                LeekCommand::Mock => leek::mock(msg)?
+            };
+            state.client.privmsg(channel, &output).await?;
+        }
+        None => {
+            state.client.privmsg(channel, "No last messages found.").await?;
+        }
+    }
+    Ok(())
+}
+
 async fn handle_privmsg(
     state: &mut AppState,
     nick: String,
@@ -166,42 +188,13 @@ async fn handle_privmsg(
             state.client.privmsg(&channel, response).await?;
         }
         "mock" => {
-            let user = match remainder {
-                Some(u) => match u {
-                    "" => &nick,
-                    _ => u,
-                },
-                None => &nick,
-            }
-            .trim();
-            if let Some(prev_msg) = state.last_msgs.get(user) {
-                let resp = bots::leek::mock(prev_msg);
-                state.client.privmsg(&channel, &resp).await?;
-            } else {
-                state
-                    .client
-                    .privmsg(&channel, "No previous messages to mock!")
-                    .await?;
-            }
+            execute_leek(state, LeekCommand::Mock, channel, remainder.unwrap_or(&nick)).await?;
         }
         "leet" => {
-            let user = match remainder {
-                Some(u) => match u {
-                    "" => &nick,
-                    _ => u,
-                },
-                None => &nick,
-            }
-            .trim();
-            if let Some(prev_msg) = state.last_msgs.get(user) {
-                let resp = bots::leek::leetify(prev_msg);
-                state.client.privmsg(&channel, &resp).await?;
-            } else {
-                state
-                    .client
-                    .privmsg(&channel, "No previous messages to leetify!")
-                    .await?;
-            }
+            execute_leek(state, LeekCommand::Leet, channel, remainder.unwrap_or(&nick)).await?;
+        }
+        "owo" => {
+            execute_leek(state, LeekCommand::Owo, channel, remainder.unwrap_or(&nick)).await?;
         }
         _ => {
             state.client.privmsg(&channel, "Unknown command").await?;

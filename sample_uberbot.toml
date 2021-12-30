@@ -2,7 +2,7 @@
 host = "karx.xyz"
 port = 6697
 username = "uberbot"
-channels = ["#main, #no-normies"]
+channels = ["#main", "#no-normies"]
 mode = "+B"
 
 # Spotify config
