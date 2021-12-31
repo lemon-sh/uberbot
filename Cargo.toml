@@ -20,4 +20,5 @@ toml = "0.5"
 serde = "1.0"
 arrayvec = "0.7"
 rand = "0.8"
+meval = "0.2"
 async-circe = { git = "https://git.karx.xyz/circe/async-circe" }
