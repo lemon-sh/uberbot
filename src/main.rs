@@ -1,6 +1,6 @@
 use async_circe::{commands::Command, Client, Config};
 use bots::title::Titlebot;
-use bots::{weeb, leek};
+use bots::{leek, weeb};
 use rspotify::Credentials;
 use serde::Deserialize;
 use std::fs::File;
@@ -61,7 +61,8 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::from_env("UBERBOT_LOG"))
         .init();
 
-    let mut file = File::open(env::var("UBERBOT_CONFIG").unwrap_or_else(|_| "uberbot.toml".to_string()))?;
+    let mut file =
+        File::open(env::var("UBERBOT_CONFIG").unwrap_or_else(|_| "uberbot.toml".to_string()))?;
     let mut client_conf = String::new();
     file.read_to_string(&mut client_conf)?;
 
@@ -133,20 +134,30 @@ async fn handle_message(state: &mut AppState, command: Command) -> anyhow::Resul
 }
 
 enum LeekCommand {
-    Owo, Leet, Mock
+    Owo,
+    Leet,
+    Mock,
 }
-async fn execute_leek(state: &mut AppState, cmd: LeekCommand, channel: &str, nick: &str) -> anyhow::Result<()> {
+async fn execute_leek(
+    state: &mut AppState,
+    cmd: LeekCommand,
+    channel: &str,
+    nick: &str,
+) -> anyhow::Result<()> {
     match state.last_msgs.get(nick) {
         Some(msg) => {
             let output = match cmd {
                 LeekCommand::Owo => leek::owoify(msg)?,
                 LeekCommand::Leet => leek::leetify(msg)?,
-                LeekCommand::Mock => leek::mock(msg)?
+                LeekCommand::Mock => leek::mock(msg)?,
             };
             state.client.privmsg(channel, &output).await?;
         }
         None => {
-            state.client.privmsg(channel, "No last messages found.").await?;
+            state
+                .client
+                .privmsg(channel, "No last messages found.")
+                .await?;
         }
     }
     Ok(())
@@ -188,10 +199,22 @@ async fn handle_privmsg(
             state.client.privmsg(&channel, response).await?;
         }
         "mock" => {
-            execute_leek(state, LeekCommand::Mock, channel, remainder.unwrap_or(&nick)).await?;
+            execute_leek(
+                state,
+                LeekCommand::Mock,
+                channel,
+                remainder.unwrap_or(&nick),
+            )
+            .await?;
         }
         "leet" => {
-            execute_leek(state, LeekCommand::Leet, channel, remainder.unwrap_or(&nick)).await?;
+            execute_leek(
+                state,
+                LeekCommand::Leet,
+                channel,
+                remainder.unwrap_or(&nick),
+            )
+            .await?;
         }
         "owo" => {
             execute_leek(state, LeekCommand::Owo, channel, remainder.unwrap_or(&nick)).await?;
