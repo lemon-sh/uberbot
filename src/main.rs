@@ -3,7 +3,7 @@ mod bots;
 use arrayvec::ArrayString;
 use async_circe::{commands::Command, Client, Config};
 use bots::title::Titlebot;
-use bots::{leek, misc};
+use bots::{leek, misc, sed};
 use rspotify::Credentials;
 use serde::Deserialize;
 use std::fs::File;
@@ -19,7 +19,7 @@ const HELP: &[&str] = &[
     " * waifu <category>",
     " * owo/mock/leet [user]",
     " * ev <math expression>",
-    " - This bot also provides titles of URLs and details for Spotify URIs/links."
+    " - This bot also provides titles of URLs and details for Spotify URIs/links. It can also resolve sed expressions."
 ];
 
 #[cfg(unix)]
@@ -121,19 +121,13 @@ async fn executor(mut state: AppState) -> anyhow::Result<()> {
 
 async fn message_loop(state: &mut AppState) -> anyhow::Result<()> {
     while let Some(cmd) = state.client.read().await? {
-        handle_message(state, cmd).await?;
-    }
-    Ok(())
-}
-
-async fn handle_message(state: &mut AppState, command: Command) -> anyhow::Result<()> {
-    // change this to a match when more commands are handled
-    if let Command::PRIVMSG(nick, channel, message) = command {
-        if let Err(e) = handle_privmsg(state, nick, &channel, message).await {
-            state
-                .client
-                .privmsg(&channel, &format!("Error: {}", e))
-                .await?;
+        if let Command::PRIVMSG(nick, channel, message) = cmd {
+            if let Err(e) = handle_privmsg(state, nick, &channel, message).await {
+                state
+                    .client
+                    .privmsg(&channel, &format!("Error: {}", e))
+                    .await?;
+            }
         }
     }
     Ok(())
@@ -171,11 +165,11 @@ async fn handle_privmsg(
         }
 
         if let Some(prev_msg) = state.last_msgs.get(&nick) {
-            if let Some(formatted) = bots::sed::resolve(prev_msg, &message)? {
+            if let Some(formatted) = sed::resolve(prev_msg, &message)? {
                 let mut result = ArrayString::<512>::new();
                 write!(result, "<{}> {}", nick, formatted)?;
                 state.client.privmsg(&channel, &result).await?;
-                state.last_msgs.insert(nick, formatted.to_string()); // yes i know this is an allocation, but the hashmap takes a string so nothing i can do
+                state.last_msgs.insert(nick, formatted.to_string());
                 return Ok(());
             }
         }
@@ -189,7 +183,7 @@ async fn handle_privmsg(
     } else {
         (&message[state.prefix.len()..], None)
     };
-    tracing::debug!("Command received {:?} -> ({:?}; {:?})", message, command, remainder);
+    tracing::debug!("Command received ({:?}; {:?})", command, remainder);
 
     match command {
         "help" => {
