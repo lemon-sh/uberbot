@@ -167,6 +167,13 @@ async fn handle_privmsg(
         if let Some(titlebot_msg) = state.titlebot.resolve(&message).await? {
             state.client.privmsg(&channel, &titlebot_msg).await?;
         }
+
+        if let Some(prev_msg) = state.last_msgs.get(&nick) {
+            if let Some(formatted) = bots::sed::resolve(prev_msg, &message)? {
+                state.client.privmsg(&channel, &formatted).await?;
+            }
+        }
+
         state.last_msgs.insert(nick, message);
         return Ok(());
     }

@@ -22,3 +22,5 @@ arrayvec = "0.7"
 rand = "0.8"
 meval = "0.2"
 async-circe = { git = "https://git.karx.xyz/circe/async-circe" }
+lazy_static = "1.4.0"
+sedregex = "0.2.5"
