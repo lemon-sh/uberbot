@@ -81,7 +81,7 @@ async fn main() -> anyhow::Result<()> {
     let client_config: ClientConf = toml::from_str(&client_conf)?;
 
     let (db_exec, db_conn) = DbExecutor::create(client_config.db_path.as_deref().unwrap_or("uberbot.db3"))?;
-    thread::spawn(move || {
+    let exec_thread = thread::spawn(move || {
         db_exec.run();
         tracing::info!("Database executor has been shut down");
     });
@@ -115,6 +115,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::error!("Error in message loop: {}", e);
     }
 
+    exec_thread.join();
     tracing::info!("Shutting down");
 
     Ok(())
