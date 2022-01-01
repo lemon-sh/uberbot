@@ -1,5 +1,6 @@
 mod bots;
 
+use arrayvec::ArrayString;
 use async_circe::{commands::Command, Client, Config};
 use bots::title::Titlebot;
 use bots::{leek, misc};
@@ -10,6 +11,7 @@ use std::io::Read;
 use std::{collections::HashMap, env};
 use tokio::select;
 use tracing_subscriber::EnvFilter;
+use std::fmt::Write;
 
 // this will be displayed when the help command is used
 const HELP: &[&str] = &[
@@ -170,7 +172,11 @@ async fn handle_privmsg(
 
         if let Some(prev_msg) = state.last_msgs.get(&nick) {
             if let Some(formatted) = bots::sed::resolve(prev_msg, &message)? {
-                state.client.privmsg(&channel, &formatted).await?;
+                let mut result = ArrayString::<512>::new();
+                write!(result, "<{}> {}", nick, formatted)?;
+                state.client.privmsg(&channel, &result).await?;
+                state.last_msgs.insert(nick, formatted.to_string()); // yes i know this is an allocation, but the hashmap takes a string so nothing i can do
+                return Ok(());
             }
         }
 
