@@ -6,47 +6,43 @@ use lazy_static::lazy_static;
 use sedregex::find_and_replace;
 
 #[derive(Debug)]
-pub enum SedErrorKind {
+pub enum SedError {
     Capacity(CapacityError),
     Regex(fancy_regex::Error),
     SedRegex(sedregex::ErrorKind)
 }
 
-#[derive(Debug)]
-pub struct SedCapacityError(SedErrorKind);
-
-impl Display for SedCapacityError {
+impl Display for SedError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // yeah it's ugly but there's no better way afaik
-        match &self.0 {
-            SedErrorKind::Capacity(e) => Display::fmt(e, f),
-            SedErrorKind::Regex(e) => Display::fmt(e, f),
-            SedErrorKind::SedRegex(e) => Display::fmt(e, f),
+        match self {
+            Self::Capacity(e) => e.fmt(f),
+            Self::Regex(e) => e.fmt(f),
+            Self::SedRegex(e) => e.fmt(f),
         }
     }
 }
 
-impl Error for SedCapacityError {}
+impl Error for SedError {}
 
-impl<T> From<CapacityError<T>> for SedCapacityError {
+impl<T> From<CapacityError<T>> for SedError {
     fn from(e: CapacityError<T>) -> Self {
-        Self { 0: SedErrorKind::Capacity(e.simplify()) }
+        Self::Capacity(e.simplify())
     }
 }
 
-impl From<fancy_regex::Error> for SedCapacityError {
+impl From<fancy_regex::Error> for SedError {
     fn from(e: fancy_regex::Error) -> Self {
-        Self { 0: SedErrorKind::Regex(e) }
+        Self::Regex(e)
     }
 }
 
-impl From<sedregex::ErrorKind> for SedCapacityError {
+impl From<sedregex::ErrorKind> for SedError {
     fn from(e: sedregex::ErrorKind) -> Self {
-        Self { 0: SedErrorKind::SedRegex(e) }
+        Self::SedRegex(e)
     }
 }
 
-type SedResult = Result<Option<ArrayString<512>>, SedCapacityError>;
+type SedResult = Result<Option<ArrayString<512>>, SedError>;
 
 pub fn resolve(prev_msg: &str, cmd: &str) -> SedResult {
     lazy_static! {
@@ -54,14 +50,12 @@ pub fn resolve(prev_msg: &str, cmd: &str) -> SedResult {
     }
 
     if RE.is_match(cmd)? {
-        if let Some(mat) = RE.find(cmd)? {
+        return if let Some(mat) = RE.find(cmd)? {
             let slice = &cmd[mat.start()..mat.end()];
-            
             let formatted = find_and_replace(&prev_msg, [slice])?;
-
-            return Ok(Some(ArrayString::from(&formatted)?));
+            Ok(Some(ArrayString::from(&formatted)?))
         } else {
-            return Ok(None);
+            Ok(None)
         }
     }
 
