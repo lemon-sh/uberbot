@@ -10,7 +10,6 @@ pub async fn get_waifu_pic(category: &str) -> anyhow::Result<Option<String>> {
         .text()
         .await?;
     let api_resp = api_resp.trim();
-    tracing::debug!("API response: {}", api_resp);
     let value: Value = serde_json::from_str(&api_resp)?;
     let url = value["url"].as_str().map(|v| v.to_string());
     Ok(url)

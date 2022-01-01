@@ -1,4 +1,5 @@
 mod bots;
+mod database;
 
 use arrayvec::ArrayString;
 use async_circe::{commands::Command, Client, Config};
@@ -12,6 +13,8 @@ use std::{collections::HashMap, env};
 use tokio::select;
 use tracing_subscriber::EnvFilter;
 use std::fmt::Write;
+use std::thread;
+use crate::database::{DbExecutor, ExecutorConnection};
 
 // this will be displayed when the help command is used
 const HELP: &[&str] = &[
@@ -48,6 +51,7 @@ struct AppState {
     last_msgs: HashMap<String, String>,
     last_eval: HashMap<String, f64>,
     titlebot: Titlebot,
+    db: ExecutorConnection
 }
 
 #[derive(Deserialize)]
@@ -61,6 +65,7 @@ struct ClientConf {
     spotify_client_id: String,
     spotify_client_secret: String,
     prefix: String,
+    db_path: Option<String>
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -74,6 +79,12 @@ async fn main() -> anyhow::Result<()> {
     file.read_to_string(&mut client_conf)?;
 
     let client_config: ClientConf = toml::from_str(&client_conf)?;
+
+    let (db_exec, db_conn) = DbExecutor::create(client_config.db_path.as_deref().unwrap_or("uberbot.db3"))?;
+    thread::spawn(move || {
+        db_exec.run();
+        tracing::info!("Database executor has been shut down");
+    });
 
     let spotify_creds = Credentials::new(
         &client_config.spotify_client_id,
@@ -97,6 +108,7 @@ async fn main() -> anyhow::Result<()> {
         last_msgs: HashMap::new(),
         last_eval: HashMap::new(),
         titlebot: Titlebot::create(spotify_creds).await?,
+        db: db_conn
     };
 
     if let Err(e) = executor(state).await {
@@ -133,12 +145,14 @@ async fn message_loop(state: &mut AppState) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
 enum LeekCommand {
     Owo, Leet, Mock
 }
 async fn execute_leek(state: &mut AppState, cmd: LeekCommand, channel: &str, nick: &str) -> anyhow::Result<()> {
     match state.last_msgs.get(nick) {
         Some(msg) => {
+            tracing::debug!("Executing {:?} on {:?}", cmd, msg);
             let output = match cmd {
                 LeekCommand::Owo => leek::owoify(msg)?,
                 LeekCommand::Leet => leek::leetify(msg)?,
@@ -151,6 +165,14 @@ async fn execute_leek(state: &mut AppState, cmd: LeekCommand, channel: &str, nic
         }
     }
     Ok(())
+}
+
+fn separate_to_space(str: &str, prefix_len: usize) -> (&str, Option<&str>) {
+    if let Some(o) = str.find(' ') {
+        (&str[prefix_len..o], Some(&str[o + 1..]))
+    } else {
+        (&str[prefix_len..], None)
+    }
 }
 
 async fn handle_privmsg(
@@ -177,12 +199,7 @@ async fn handle_privmsg(
         state.last_msgs.insert(nick, message);
         return Ok(());
     }
-    let space_index = message.find(' ');
-    let (command, remainder) = if let Some(o) = space_index {
-        (&message[state.prefix.len()..o], Some(&message[o + 1..]))
-    } else {
-        (&message[state.prefix.len()..], None)
-    };
+    let (command, remainder) = separate_to_space(&message, state.prefix.len());
     tracing::debug!("Command received ({:?}; {:?})", command, remainder);
 
     match command {
@@ -212,6 +229,34 @@ async fn handle_privmsg(
         "ev" => {
             let result = misc::mathbot(nick, remainder, &mut state.last_eval)?;
             state.client.privmsg(&channel, &result).await?;
+        }
+        "grab" => {
+            if let Some(target) = remainder {
+                if target == nick {
+                    state.client.privmsg(&channel, "You can't grab yourself").await?;
+                    return Ok(())
+                }
+                if let Some(prev_msg) = state.last_msgs.get(target) {
+                    if state.db.add_quote(prev_msg.clone(), target.into()).await {
+                        state.client.privmsg(&channel, "Quote added").await?;
+                    } else {
+                        state.client.privmsg(&channel, "A database error has occurred").await?;
+                    }
+                } else {
+                    state.client.privmsg(&channel, "No previous messages to grab").await?;
+                }
+            } else {
+                state.client.privmsg(&channel, "No nickname to grab").await?;
+            }
+        }
+        "quot" => {
+            if let Some(quote) = state.db.get_quote(remainder.map(|v| v.to_string())).await {
+                let mut resp = ArrayString::<512>::new();
+                write!(resp, "\"{}\" ~{}", quote.0, quote.1)?;
+                state.client.privmsg(&channel, &resp).await?;
+            } else {
+                state.client.privmsg(&channel, "No quotes found").await?;
+            }
         }
         _ => {
             state.client.privmsg(&channel, "Unknown command").await?;
