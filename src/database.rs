@@ -1,5 +1,8 @@
-use rusqlite::{OptionalExtension, params};
-use tokio::sync::{mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender}, oneshot};
+use rusqlite::{params, OptionalExtension};
+use tokio::sync::{
+    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+    oneshot,
+};
 
 #[derive(Debug)]
 enum Task {
@@ -17,8 +20,11 @@ impl DbExecutor {
     pub fn create(dbpath: &str) -> rusqlite::Result<(Self, ExecutorConnection)> {
         let (tx, rx) = unbounded_channel();
         let db = rusqlite::Connection::open(dbpath)?;
-        db.execute("create table if not exists quotes(id integer primary key,\
-            username text not null, quote text not null)", [])?;
+        db.execute(
+            "create table if not exists quotes(id integer primary key,\
+            username text not null, quote text not null)",
+            [],
+        )?;
         tracing::debug!("Database connected ({})", dbpath);
         Ok((Self { rx, db }, ExecutorConnection { tx }))
     }
@@ -28,7 +34,9 @@ impl DbExecutor {
             match task {
                 Task::AddQuote(tx, quote, author) => {
                     if let Err(e) = self.db.execute(
-                        "insert into quotes(quote,username) values(?,?)", params![quote,author]) {
+                        "insert into quotes(quote,username) values(?,?)",
+                        params![quote, author],
+                    ) {
                         tracing::error!("A database error has occurred: {}", e);
                         tx.send(false).unwrap();
                     } else {
@@ -57,7 +65,9 @@ pub struct ExecutorConnection {
 
 impl Clone for ExecutorConnection {
     fn clone(&self) -> Self {
-        Self { tx: self.tx.clone() }
+        Self {
+            tx: self.tx.clone(),
+        }
     }
 }
 

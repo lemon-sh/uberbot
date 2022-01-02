@@ -1,4 +1,4 @@
-use std::{fmt::Display, error::Error};
+use std::{error::Error, fmt::Display};
 
 use arrayvec::{ArrayString, CapacityError};
 use fancy_regex::Regex;
@@ -9,7 +9,7 @@ use sedregex::find_and_replace;
 pub enum SedError {
     Capacity(CapacityError),
     Regex(fancy_regex::Error),
-    SedRegex(sedregex::ErrorKind)
+    SedRegex(sedregex::ErrorKind),
 }
 
 impl Display for SedError {
@@ -56,7 +56,7 @@ pub fn resolve(prev_msg: &str, cmd: &str) -> SedResult {
             Ok(Some(ArrayString::from(&formatted)?))
         } else {
             Ok(None)
-        }
+        };
     }
 
     Ok(None)
