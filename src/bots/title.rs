@@ -23,7 +23,8 @@ async fn resolve_spotify(
     // }
     tracing::debug!(
         "Resolving Spotify resource '{}' with id '{}'",
-        resource_type, resource_id
+        resource_type,
+        resource_id
     );
     match resource_type {
         "track" => {
@@ -89,6 +90,7 @@ impl Titlebot {
             r"(?:https?|spotify):(?://open\.spotify\.com/)?(track|artist|album|playlist)[/:]([a-zA-Z0-9]*)",
         )?;
         let mut spotify = ClientCredsSpotify::new(spotify_creds);
+
         spotify.request_token().await?;
         Ok(Self {
             url_regex,
@@ -103,6 +105,7 @@ impl Titlebot {
             tracing::debug!("{}", message);
             let tp_group = m.get(1).unwrap();
             let id_group = m.get(2).unwrap();
+
             return Ok(Some(
                 resolve_spotify(
                     &mut self.spotify,
@@ -114,6 +117,7 @@ impl Titlebot {
         } else if let Some(m) = self.url_regex.find(&message)? {
             let url = &message[m.start()..m.end()];
             tracing::debug!("url: {}", url);
+
             let response = reqwest::get(url).await?;
             if let Some(header) = response.headers().get("Content-Type") {
                 tracing::debug!("response header: {}", header.to_str()?);
@@ -121,6 +125,7 @@ impl Titlebot {
                     return Ok(None);
                 }
             }
+
             let body = response.text().await?;
             if let Some(tm) = self.title_regex.find(&body)? {
                 let title_match = &body[tm.start()..tm.end()];

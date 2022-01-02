@@ -1,20 +1,20 @@
 mod bots;
 mod database;
 
+use crate::database::{DbExecutor, ExecutorConnection};
 use arrayvec::ArrayString;
 use async_circe::{commands::Command, Client, Config};
 use bots::title::Titlebot;
-use bots::{leek, misc, sed};
+use bots::{misc, misc::LeekCommand, sed};
 use rspotify::Credentials;
 use serde::Deserialize;
+use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
+use std::thread;
 use std::{collections::HashMap, env};
 use tokio::select;
 use tracing_subscriber::EnvFilter;
-use std::fmt::Write;
-use std::thread;
-use crate::database::{DbExecutor, ExecutorConnection};
 
 // this will be displayed when the help command is used
 const HELP: &[&str] = &[
@@ -45,13 +45,13 @@ async fn terminate_signal() {
     let _ = ctrlc.recv().await;
 }
 
-struct AppState {
+pub struct AppState {
     prefix: String,
     client: Client,
     last_msgs: HashMap<String, String>,
     last_eval: HashMap<String, f64>,
     titlebot: Titlebot,
-    db: ExecutorConnection
+    db: ExecutorConnection,
 }
 
 #[derive(Deserialize)]
@@ -65,7 +65,7 @@ struct ClientConf {
     spotify_client_id: String,
     spotify_client_secret: String,
     prefix: String,
-    db_path: Option<String>
+    db_path: Option<String>,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -74,13 +74,15 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::from_env("UBERBOT_LOG"))
         .init();
 
-    let mut file = File::open(env::var("UBERBOT_CONFIG").unwrap_or_else(|_| "uberbot.toml".to_string()))?;
+    let mut file =
+        File::open(env::var("UBERBOT_CONFIG").unwrap_or_else(|_| "uberbot.toml".to_string()))?;
     let mut client_conf = String::new();
     file.read_to_string(&mut client_conf)?;
 
     let client_config: ClientConf = toml::from_str(&client_conf)?;
 
-    let (db_exec, db_conn) = DbExecutor::create(client_config.db_path.as_deref().unwrap_or("uberbot.db3"))?;
+    let (db_exec, db_conn) =
+        DbExecutor::create(client_config.db_path.as_deref().unwrap_or("uberbot.db3"))?;
     let exec_thread = thread::spawn(move || {
         db_exec.run();
         tracing::info!("Database executor has been shut down");
@@ -99,6 +101,7 @@ async fn main() -> anyhow::Result<()> {
         client_config.port,
         client_config.username,
     );
+
     let mut client = Client::new(config).await?;
     client.identify().await?;
 
@@ -108,14 +111,16 @@ async fn main() -> anyhow::Result<()> {
         last_msgs: HashMap::new(),
         last_eval: HashMap::new(),
         titlebot: Titlebot::create(spotify_creds).await?,
-        db: db_conn
+        db: db_conn,
     };
 
     if let Err(e) = executor(state).await {
         tracing::error!("Error in message loop: {}", e);
     }
 
-    exec_thread.join();
+    if let Err(e) = exec_thread.join() {
+        tracing::error!("Error while shutting down the database: {:?}", e);
+    }
     tracing::info!("Shutting down");
 
     Ok(())
@@ -141,28 +146,6 @@ async fn message_loop(state: &mut AppState) -> anyhow::Result<()> {
                     .privmsg(&channel, &format!("Error: {}", e))
                     .await?;
             }
-        }
-    }
-    Ok(())
-}
-
-#[derive(Debug)]
-enum LeekCommand {
-    Owo, Leet, Mock
-}
-async fn execute_leek(state: &mut AppState, cmd: LeekCommand, channel: &str, nick: &str) -> anyhow::Result<()> {
-    match state.last_msgs.get(nick) {
-        Some(msg) => {
-            tracing::debug!("Executing {:?} on {:?}", cmd, msg);
-            let output = match cmd {
-                LeekCommand::Owo => leek::owoify(msg)?,
-                LeekCommand::Leet => leek::leetify(msg)?,
-                LeekCommand::Mock => leek::mock(msg)?
-            };
-            state.client.privmsg(channel, &output).await?;
-        }
-        None => {
-            state.client.privmsg(channel, "No last messages found.").await?;
         }
     }
     Ok(())
@@ -219,13 +202,26 @@ async fn handle_privmsg(
             state.client.privmsg(&channel, response).await?;
         }
         "mock" => {
-            execute_leek(state, LeekCommand::Mock, channel, remainder.unwrap_or(&nick)).await?;
+            misc::execute_leek(
+                state,
+                LeekCommand::Mock,
+                channel,
+                remainder.unwrap_or(&nick),
+            )
+            .await?;
         }
         "leet" => {
-            execute_leek(state, LeekCommand::Leet, channel, remainder.unwrap_or(&nick)).await?;
+            misc::execute_leek(
+                state,
+                LeekCommand::Leet,
+                channel,
+                remainder.unwrap_or(&nick),
+            )
+            .await?;
         }
         "owo" => {
-            execute_leek(state, LeekCommand::Owo, channel, remainder.unwrap_or(&nick)).await?;
+            misc::execute_leek(state, LeekCommand::Owo, channel, remainder.unwrap_or(&nick))
+                .await?;
         }
         "ev" => {
             let result = misc::mathbot(nick, remainder, &mut state.last_eval)?;
@@ -234,20 +230,32 @@ async fn handle_privmsg(
         "grab" => {
             if let Some(target) = remainder {
                 if target == nick {
-                    state.client.privmsg(&channel, "You can't grab yourself").await?;
-                    return Ok(())
+                    state
+                        .client
+                        .privmsg(&channel, "You can't grab yourself")
+                        .await?;
+                    return Ok(());
                 }
                 if let Some(prev_msg) = state.last_msgs.get(target) {
                     if state.db.add_quote(prev_msg.clone(), target.into()).await {
                         state.client.privmsg(&channel, "Quote added").await?;
                     } else {
-                        state.client.privmsg(&channel, "A database error has occurred").await?;
+                        state
+                            .client
+                            .privmsg(&channel, "A database error has occurred")
+                            .await?;
                     }
                 } else {
-                    state.client.privmsg(&channel, "No previous messages to grab").await?;
+                    state
+                        .client
+                        .privmsg(&channel, "No previous messages to grab")
+                        .await?;
                 }
             } else {
-                state.client.privmsg(&channel, "No nickname to grab").await?;
+                state
+                    .client
+                    .privmsg(&channel, "No nickname to grab")
+                    .await?;
             }
         }
         "quot" => {

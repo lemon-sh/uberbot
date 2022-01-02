@@ -1,6 +1,9 @@
 use arrayvec::{ArrayString, CapacityError};
 use rand::Rng;
-use std::{error::Error, fmt::{Debug, Display}};
+use std::{
+    error::Error,
+    fmt::{Debug, Display},
+};
 
 #[derive(Debug)]
 pub struct LeekCapacityError(CapacityError);
@@ -18,7 +21,6 @@ impl<T> From<CapacityError<T>> for LeekCapacityError {
         Self { 0: e.simplify() }
     }
 }
-
 
 type LeekResult = Result<ArrayString<512>, LeekCapacityError>;
 
@@ -99,4 +101,3 @@ pub fn owoify(input: &str) -> LeekResult {
     builder.try_push_str("~~")?;
     Ok(builder)
 }
-
