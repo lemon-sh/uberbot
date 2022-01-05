@@ -1,5 +1,6 @@
 mod bots;
 mod database;
+mod web_service;
 
 use crate::database::{DbExecutor, ExecutorConnection};
 use arrayvec::ArrayString;
@@ -13,6 +14,7 @@ use std::fs::File;
 use std::io::Read;
 use std::thread;
 use std::{collections::HashMap, env};
+use std::net::SocketAddr;
 use tokio::select;
 use tracing_subscriber::EnvFilter;
 
@@ -66,6 +68,7 @@ struct ClientConf {
     spotify_client_secret: String,
     prefix: String,
     db_path: Option<String>,
+    http_listen: Option<SocketAddr>
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -114,7 +117,8 @@ async fn main() -> anyhow::Result<()> {
         db: db_conn,
     };
 
-    if let Err(e) = executor(state).await {
+    let http_listen = client_config.http_listen.unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 5000)));
+    if let Err(e) = executor(state, http_listen).await {
         tracing::error!("Error in message loop: {}", e);
     }
 
@@ -126,8 +130,10 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn executor(mut state: AppState) -> anyhow::Result<()> {
+async fn executor(mut state: AppState, http_listen: SocketAddr) -> anyhow::Result<()> {
+    let web_db = state.db.clone();
     select! {
+        r = web_service::run(web_db, http_listen) => r?,
         r = message_loop(&mut state) => r?,
         _ = terminate_signal() => {
             tracing::info!("Sending QUIT message");

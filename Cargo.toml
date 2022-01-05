@@ -25,7 +25,7 @@ async-circe = { git = "https://git.karx.xyz/circe/async-circe", default-features
 lazy_static = "1.4"
 sedregex = "0.2"
 rusqlite = { version = "0.26", features = ["bundled"] }
-hyper = "0.14"
+hyper = { version = "0.14", features = ["server"] }
 
 [features]
 tls = ["async-circe/tls"]

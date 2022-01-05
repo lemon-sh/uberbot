@@ -11,3 +11,6 @@ spotify_client_secret = ""
 
 # Bot config
 prefix = "!"
+
+# Web service config
+http_listen = "127.0.0.1:8080"
