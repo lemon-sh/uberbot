@@ -21,7 +21,11 @@ serde = "1.0"
 arrayvec = "0.7"
 rand = "0.8"
 meval = "0.2"
-async-circe = { git = "https://git.karx.xyz/circe/async-circe" }
+async-circe = { git = "https://git.karx.xyz/circe/async-circe", default-features = false }
 lazy_static = "1.4"
 sedregex = "0.2"
 rusqlite = { version = "0.26", features = ["bundled"] }
+hyper = "0.14"
+
+[features]
+tls = ["async-circe/tls"]
