@@ -26,6 +26,7 @@ lazy_static = "1.4"
 sedregex = "0.2"
 rusqlite = { version = "0.26", features = ["bundled"] }
 hyper = { version = "0.14", features = ["server"] }
+warp = "0.3"
 
 [features]
 tls = ["async-circe/tls"]

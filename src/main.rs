@@ -12,10 +12,11 @@ use serde::Deserialize;
 use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
+use std::net::SocketAddr;
 use std::thread;
 use std::{collections::HashMap, env};
-use std::net::SocketAddr;
 use tokio::select;
+use tokio::sync::mpsc::{channel, Receiver};
 use tracing_subscriber::EnvFilter;
 
 // this will be displayed when the help command is used
@@ -54,6 +55,8 @@ pub struct AppState {
     last_eval: HashMap<String, f64>,
     titlebot: Titlebot,
     db: ExecutorConnection,
+    git_channel: String,
+    git_recv: Receiver<String>,
 }
 
 #[derive(Deserialize)]
@@ -68,7 +71,8 @@ struct ClientConf {
     spotify_client_secret: String,
     prefix: String,
     db_path: Option<String>,
-    http_listen: Option<SocketAddr>
+    http_listen: Option<SocketAddr>,
+    git_channel: String,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -96,6 +100,13 @@ async fn main() -> anyhow::Result<()> {
         &client_config.spotify_client_secret,
     );
 
+    let http_listen = client_config
+        .http_listen
+        .unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 5000)));
+
+    let (git_tx, git_recv) = channel(512);
+    bots::git::run(git_tx, http_listen).await?;
+
     let config = Config::runtime_config(
         client_config.channels,
         client_config.host,
@@ -115,9 +126,10 @@ async fn main() -> anyhow::Result<()> {
         last_eval: HashMap::new(),
         titlebot: Titlebot::create(spotify_creds).await?,
         db: db_conn,
+        git_channel: client_config.git_channel,
+        git_recv,
     };
 
-    let http_listen = client_config.http_listen.unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 5000)));
     if let Err(e) = executor(state, http_listen).await {
         tracing::error!("Error in message loop: {}", e);
     }
@@ -152,6 +164,10 @@ async fn message_loop(state: &mut AppState) -> anyhow::Result<()> {
                     .privmsg(&channel, &format!("Error: {}", e))
                     .await?;
             }
+        }
+
+        if let Some(s) = state.git_recv.recv().await {
+            state.client.privmsg(&state.git_channel, &s).await?;
         }
     }
     Ok(())
