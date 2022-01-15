@@ -1,23 +1,38 @@
-use std::net::SocketAddr;
 use crate::ExecutorConnection;
-use std::convert::Infallible;
-use std::sync::Arc;
-use hyper::{Body, Request, Response, Server};
-use hyper::service::{make_service_fn, service_fn};
+use std::net::SocketAddr;
+use tokio::sync::mpsc::Sender;
+use warp::Filter;
 
-pub async fn run(db: ExecutorConnection, listen: SocketAddr) -> anyhow::Result<()> {
-    let db = Arc::new(db);
+pub async fn run(
+    db: ExecutorConnection,
+    tx: Sender<String>,
+    listen: SocketAddr,
+) -> anyhow::Result<()> {
+    let db_filter = warp::any().map(move || db.clone());
+    let db_filter = warp::get().and(db_filter).and_then(handle);
 
-    Server::bind(&listen).serve(make_service_fn(|_| {
-        let db = Arc::clone(&db);
-        async move {
-            Ok::<_, Infallible>(service_fn(move |r| handle(r, Arc::clone(&db))))
-        }
-    })).await?;
+    let tx_filter = warp::any().map(move || tx.clone());
+    let tx_filter = warp::path("webhook")
+        .and(warp::post())
+        .and(warp::body::json())
+        .and(tx_filter)
+        .and_then(crate::bots::git::handle_post);
 
+    let filter = db_filter.or(tx_filter);
+    warp::serve(filter).run(listen).await;
     Ok(())
 }
 
-async fn handle(req: Request<Body>, db: Arc<ExecutorConnection>) -> Result<Response<Body>, Infallible> {
-    Ok(Response::new(Body::from(format!("{:?}", db.get_quote(None).await))))
+async fn handle(db: ExecutorConnection) -> Result<impl warp::Reply, warp::Rejection> {
+    if let Some((a, b)) = db.get_quote(None).await {
+        Ok(warp::reply::with_status(
+            format!("{} {}", a, b),
+            warp::http::StatusCode::OK,
+        ))
+    } else {
+        Ok(warp::reply::with_status(
+            "None".into(),
+            warp::http::StatusCode::NO_CONTENT,
+        ))
+    }
 }

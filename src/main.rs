@@ -12,10 +12,11 @@ use serde::Deserialize;
 use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
+use std::net::SocketAddr;
 use std::thread;
 use std::{collections::HashMap, env};
-use std::net::SocketAddr;
 use tokio::select;
+use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tracing_subscriber::EnvFilter;
 
 // this will be displayed when the help command is used
@@ -54,6 +55,7 @@ pub struct AppState {
     last_eval: HashMap<String, f64>,
     titlebot: Titlebot,
     db: ExecutorConnection,
+    git_channel: String,
 }
 
 #[derive(Deserialize)]
@@ -68,7 +70,8 @@ struct ClientConf {
     spotify_client_secret: String,
     prefix: String,
     db_path: Option<String>,
-    http_listen: Option<SocketAddr>
+    http_listen: Option<SocketAddr>,
+    git_channel: String,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -96,6 +99,10 @@ async fn main() -> anyhow::Result<()> {
         &client_config.spotify_client_secret,
     );
 
+    let http_listen = client_config
+        .http_listen
+        .unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 5000)));
+
     let config = Config::runtime_config(
         client_config.channels,
         client_config.host,
@@ -115,10 +122,12 @@ async fn main() -> anyhow::Result<()> {
         last_eval: HashMap::new(),
         titlebot: Titlebot::create(spotify_creds).await?,
         db: db_conn,
+        git_channel: client_config.git_channel,
     };
 
-    let http_listen = client_config.http_listen.unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 5000)));
-    if let Err(e) = executor(state, http_listen).await {
+    let (git_tx, git_recv) = channel(512);
+
+    if let Err(e) = executor(state, git_tx, git_recv, http_listen).await {
         tracing::error!("Error in message loop: {}", e);
     }
 
@@ -130,11 +139,22 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn executor(mut state: AppState, http_listen: SocketAddr) -> anyhow::Result<()> {
+async fn executor(
+    mut state: AppState,
+    git_tx: Sender<String>,
+    mut git_recv: Receiver<String>,
+    http_listen: SocketAddr,
+) -> anyhow::Result<()> {
     let web_db = state.db.clone();
+    let git_channel = state.git_channel.clone();
     select! {
-        r = web_service::run(web_db, http_listen) => r?,
+        r = web_service::run(web_db, git_tx, http_listen) => r?,
         r = message_loop(&mut state) => r?,
+        r = git_recv.recv() => {
+            if let Some(message) = r {
+                state.client.privmsg(&git_channel, &message).await?;
+            }
+        }
         _ = terminate_signal() => {
             tracing::info!("Sending QUIT message");
             state.client.quit(Some("überbot shutting down")).await?;
