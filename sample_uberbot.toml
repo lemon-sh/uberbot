@@ -13,4 +13,9 @@ spotify_client_secret = ""
 prefix = "!"
 
 # Web service config
-http_listen = "127.0.0.1:8080"
+http_listen_db = "127.0.0.1:8080"
+
+# Git webhook config
+http_listen_git = "127.0.0.1:51001"
+git_channel = "#main"
+
