@@ -48,8 +48,6 @@ async fn handle_post(json: serde_json::Value, tx: Tx) -> Result<impl warp::Reply
 }
 
 pub async fn run(tx: Sender<String>, listen: SocketAddr) -> Result<(), tokio::io::Error> {
-    //let addr = SocketAddr::from((Ipv4Addr::new(192, 168, 1, 66), 51001));
-    //println!("{:?}", addr);
     let tx = Tx::new(tx);
     let tx_filter = warp::any().map(move || tx.clone());
 
