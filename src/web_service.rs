@@ -31,7 +31,7 @@ async fn handle(db: ExecutorConnection) -> Result<impl warp::Reply, warp::Reject
         ))
     } else {
         Ok(warp::reply::with_status(
-            format!("None"),
+            "None".into(),
             warp::http::StatusCode::NO_CONTENT,
         ))
     }
