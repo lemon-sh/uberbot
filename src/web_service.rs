@@ -9,7 +9,7 @@ pub async fn run(
     listen: SocketAddr,
 ) -> anyhow::Result<()> {
     let db_filter = warp::any().map(move || db.clone());
-    let db_filter = warp::any().and(db_filter).and_then(handle);
+    let db_filter = warp::get().and(db_filter).and_then(handle);
 
     let tx_filter = warp::any().map(move || tx.clone());
     let tx_filter = warp::path("webhook")
