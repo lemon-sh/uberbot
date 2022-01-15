@@ -1,29 +1,26 @@
 use crate::ExecutorConnection;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server};
-use std::convert::Infallible;
 use std::net::SocketAddr;
-use std::sync::Arc;
+use warp::Filter;
 
 pub async fn run(db: ExecutorConnection, listen: SocketAddr) -> anyhow::Result<()> {
-    let db = Arc::new(db);
+    let db_filter = warp::any().map(move || db.clone());
+    let filter = warp::any().and(db_filter).and_then(handle);
 
-    Server::bind(&listen)
-        .serve(make_service_fn(|_| {
-            let db = Arc::clone(&db);
-            async move { Ok::<_, Infallible>(service_fn(move |r| handle(r, Arc::clone(&db)))) }
-        }))
-        .await?;
+    warp::serve(filter).run(listen).await;
 
     Ok(())
 }
 
-async fn handle(
-    _req: Request<Body>,
-    db: Arc<ExecutorConnection>,
-) -> Result<Response<Body>, Infallible> {
-    Ok(Response::new(Body::from(format!(
-        "{:?}",
-        db.get_quote(None).await
-    ))))
+async fn handle(db: ExecutorConnection) -> Result<impl warp::Reply, warp::Rejection> {
+    if let Some((a, b)) = db.get_quote(None).await {
+        Ok(warp::reply::with_status(
+            format!("{} {}", a, b),
+            warp::http::StatusCode::OK,
+        ))
+    } else {
+        Ok(warp::reply::with_status(
+            format!("None"),
+            warp::http::StatusCode::NO_CONTENT,
+        ))
+    }
 }
