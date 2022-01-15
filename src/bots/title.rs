@@ -91,7 +91,7 @@ impl Titlebot {
         )?;
         let mut spotify = ClientCredsSpotify::new(spotify_creds);
 
-        spotify.request_token().await?;
+        //spotify.request_token().await?;
         Ok(Self {
             url_regex,
             title_regex,

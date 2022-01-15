@@ -71,7 +71,8 @@ struct ClientConf {
     spotify_client_secret: String,
     prefix: String,
     db_path: Option<String>,
-    http_listen: Option<SocketAddr>,
+    http_listen_db: Option<SocketAddr>,
+    http_listen_git: SocketAddr,
     git_channel: String,
 }
 
@@ -101,11 +102,11 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let http_listen = client_config
-        .http_listen
+        .http_listen_db
         .unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 5000)));
 
     let (git_tx, git_recv) = channel(512);
-    bots::git::run(git_tx, http_listen).await?;
+    tokio::spawn(bots::git::run(git_tx, client_config.http_listen_git));
 
     let config = Config::runtime_config(
         client_config.channels,
@@ -145,7 +146,7 @@ async fn main() -> anyhow::Result<()> {
 async fn executor(mut state: AppState, http_listen: SocketAddr) -> anyhow::Result<()> {
     let web_db = state.db.clone();
     select! {
-        r = web_service::run(web_db, http_listen) => r?,
+        //r = web_service::run(web_db, http_listen) => r?;
         r = message_loop(&mut state) => r?,
         _ = terminate_signal() => {
             tracing::info!("Sending QUIT message");
@@ -169,6 +170,8 @@ async fn message_loop(state: &mut AppState) -> anyhow::Result<()> {
         if let Some(s) = state.git_recv.recv().await {
             state.client.privmsg(&state.git_channel, &s).await?;
         }
+
+        tracing::info!("aaa");
     }
     Ok(())
 }
