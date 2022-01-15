@@ -56,7 +56,6 @@ pub struct AppState {
     titlebot: Titlebot,
     db: ExecutorConnection,
     git_channel: String,
-    git_recv: Receiver<String>,
 }
 
 #[derive(Deserialize)]
@@ -128,10 +127,9 @@ async fn main() -> anyhow::Result<()> {
         titlebot: Titlebot::create(spotify_creds).await?,
         db: db_conn,
         git_channel: client_config.git_channel,
-        git_recv,
     };
 
-    if let Err(e) = executor(state, http_listen).await {
+    if let Err(e) = executor(state, git_recv, http_listen).await {
         tracing::error!("Error in message loop: {}", e);
     }
 
@@ -143,11 +141,17 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn executor(mut state: AppState, http_listen: SocketAddr) -> anyhow::Result<()> {
+async fn executor(
+    mut state: AppState,
+    mut git_recv: Receiver<String>,
+    http_listen: SocketAddr,
+) -> anyhow::Result<()> {
     let web_db = state.db.clone();
+    let git_channel = state.git_channel.clone();
     select! {
-        //r = web_service::run(web_db, http_listen) => r?;
+        r = web_service::run(web_db, http_listen) => r?,
         r = message_loop(&mut state) => r?,
+        r = git_recv.recv() => state.client.privmsg(&git_channel, &get_str(r)).await?,
         _ = terminate_signal() => {
             tracing::info!("Sending QUIT message");
             state.client.quit(Some("überbot shutting down")).await?;
@@ -166,12 +170,6 @@ async fn message_loop(state: &mut AppState) -> anyhow::Result<()> {
                     .await?;
             }
         }
-
-        if let Some(s) = state.git_recv.recv().await {
-            state.client.privmsg(&state.git_channel, &s).await?;
-        }
-
-        tracing::info!("aaa");
     }
     Ok(())
 }
@@ -297,4 +295,12 @@ async fn handle_privmsg(
         }
     }
     Ok(())
+}
+
+fn get_str(r: Option<String>) -> String {
+    if let Some(s) = r {
+        s
+    } else {
+        String::new()
+    }
 }
