@@ -150,7 +150,11 @@ async fn executor(
     select! {
         r = web_service::run(web_db, git_tx, http_listen) => r?,
         r = message_loop(&mut state) => r?,
-        r = git_recv.recv() => state.client.privmsg(&git_channel, &r.unwrap_or_default()).await?,
+        r = git_recv.recv() => {
+            if let Some(message) = r {
+                state.client.privmsg(&git_channel, &message).await?;
+            }
+        }
         _ = terminate_signal() => {
             tracing::info!("Sending QUIT message");
             state.client.quit(Some("überbot shutting down")).await?;
