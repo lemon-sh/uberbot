@@ -24,7 +24,7 @@ impl<T> From<CapacityError<T>> for LeekCapacityError {
 
 type LeekResult = Result<ArrayString<512>, LeekCapacityError>;
 
-pub fn mock(input: &str) -> LeekResult {
+fn mock(input: &str) -> LeekResult {
     let mut builder = ArrayString::<512>::new();
 
     for ch in input.chars() {
@@ -38,7 +38,7 @@ pub fn mock(input: &str) -> LeekResult {
     Ok(builder)
 }
 
-pub fn leetify(input: &str) -> LeekResult {
+fn leetify(input: &str) -> LeekResult {
     let mut builder = ArrayString::<512>::new();
 
     for ch in input.chars() {
@@ -58,7 +58,7 @@ pub fn leetify(input: &str) -> LeekResult {
     Ok(builder)
 }
 
-pub fn owoify(input: &str) -> LeekResult {
+fn owoify(input: &str) -> LeekResult {
     let mut builder: ArrayString<512> = ArrayString::from("\x1d")?;
     let mut rng = rand::thread_rng();
     let mut last_char = '\0';
@@ -100,4 +100,36 @@ pub fn owoify(input: &str) -> LeekResult {
     }
     builder.try_push_str("~~")?;
     Ok(builder)
+}
+
+#[derive(Debug)]
+pub enum LeekCommand {
+    Owo,
+    Leet,
+    Mock,
+}
+
+pub fn execute_leek(
+    state: &mut crate::AppState,
+    cmd: LeekCommand,
+    target: &str,
+    nick: &str,
+) -> anyhow::Result<()> {
+    match state.last_msgs.get(nick) {
+        Some(msg) => {
+            tracing::debug!("Executing {:?} on {:?}", cmd, msg);
+            let output = match cmd {
+                LeekCommand::Owo => super::leek::owoify(msg)?,
+                LeekCommand::Leet => super::leek::leetify(msg)?,
+                LeekCommand::Mock => super::leek::mock(msg)?,
+            };
+            state.client.send_privmsg(target, &output)?;
+        }
+        None => {
+            state
+                .client
+                .send_privmsg(target, "No last messages found.")?;
+        }
+    }
+    Ok(())
 }

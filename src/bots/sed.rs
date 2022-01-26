@@ -46,7 +46,7 @@ type SedResult = Result<Option<ArrayString<512>>, SedError>;
 
 pub fn resolve(prev_msg: &str, cmd: &str) -> SedResult {
     lazy_static! {
-        static ref RE: Regex = Regex::new(r"^s/.*/.*").unwrap(); // yes this regex is valid, don't worry about it
+        static ref RE: Regex = Regex::new(r"^s/.*/.*").unwrap();
     }
 
     if RE.is_match(cmd)? {

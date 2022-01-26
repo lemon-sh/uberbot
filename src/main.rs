@@ -1,23 +1,28 @@
-mod bots;
-mod database;
-mod web_service;
-
-use crate::database::{DbExecutor, ExecutorConnection};
-use arrayvec::ArrayString;
-use async_circe::{commands::Command, Client, Config};
-use bots::title::Titlebot;
-use bots::{misc, misc::LeekCommand, sed};
-use rspotify::Credentials;
-use serde::Deserialize;
 use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
 use std::net::SocketAddr;
 use std::thread;
 use std::{collections::HashMap, env};
+
+use arrayvec::ArrayString;
+use futures_util::stream::StreamExt;
+use irc::client::prelude::Config;
+use irc::client::Client;
+use irc::proto::{ChannelExt, Command, Prefix};
+use rspotify::Credentials;
+use serde::Deserialize;
 use tokio::select;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use tracing_log::LogTracer;
 use tracing_subscriber::EnvFilter;
+
+use crate::bots::{leek, misc, sed, title};
+use crate::database::{DbExecutor, ExecutorConnection};
+
+mod bots;
+mod database;
+mod web_service;
 
 // this will be displayed when the help command is used
 const HELP: &[&str] = &[
@@ -53,7 +58,7 @@ pub struct AppState {
     client: Client,
     last_msgs: HashMap<String, String>,
     last_eval: HashMap<String, f64>,
-    titlebot: Titlebot,
+    titlebot: title::Titlebot,
     db: ExecutorConnection,
     git_channel: String,
 }
@@ -62,6 +67,7 @@ pub struct AppState {
 struct ClientConf {
     channels: Vec<String>,
     host: String,
+    tls: bool,
     mode: Option<String>,
     nickname: Option<String>,
     port: u16,
@@ -76,6 +82,7 @@ struct ClientConf {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
+    LogTracer::init()?;
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_env("UBERBOT_LOG"))
         .init();
@@ -103,24 +110,29 @@ async fn main() -> anyhow::Result<()> {
         .http_listen
         .unwrap_or_else(|| SocketAddr::from(([127, 0, 0, 1], 5000)));
 
-    let config = Config::runtime_config(
-        client_config.channels,
-        client_config.host,
-        client_config.mode,
-        client_config.nickname,
-        client_config.port,
-        client_config.username,
-    );
-
-    let mut client = Client::new(config).await?;
-    client.identify().await?;
+    let uber_ver = concat!("Überbot ", env!("CARGO_PKG_VERSION"));
+    let irc_config = Config {
+        nickname: client_config.nickname,
+        username: Some(client_config.username.clone()),
+        realname: Some(client_config.username),
+        server: Some(client_config.host),
+        port: Some(client_config.port),
+        use_tls: Some(client_config.tls),
+        channels: client_config.channels,
+        umodes: client_config.mode,
+        user_info: Some(uber_ver.into()),
+        version: Some(uber_ver.into()),
+        ..Config::default()
+    };
+    let client = Client::from_config(irc_config).await?;
+    client.identify()?;
 
     let state = AppState {
         prefix: client_config.prefix,
         client,
         last_msgs: HashMap::new(),
         last_eval: HashMap::new(),
-        titlebot: Titlebot::create(spotify_creds).await?,
+        titlebot: title::Titlebot::create(spotify_creds).await?,
         db: db_conn,
         git_channel: client_config.git_channel,
     };
@@ -146,31 +158,39 @@ async fn executor(
     http_listen: SocketAddr,
 ) -> anyhow::Result<()> {
     let web_db = state.db.clone();
-    let git_channel = state.git_channel.clone();
     select! {
         r = web_service::run(web_db, git_tx, http_listen) => r?,
         r = message_loop(&mut state) => r?,
         r = git_recv.recv() => {
             if let Some(message) = r {
-                state.client.privmsg(&git_channel, &message).await?;
+                state.client.send_privmsg(&state.git_channel, &message)?;
             }
         }
         _ = terminate_signal() => {
             tracing::info!("Sending QUIT message");
-            state.client.quit(Some("überbot shutting down")).await?;
+            state.client.send_quit("überbot shutting down")?;
         }
     }
     Ok(())
 }
 
 async fn message_loop(state: &mut AppState) -> anyhow::Result<()> {
-    while let Some(cmd) = state.client.read().await? {
-        if let Command::PRIVMSG(nick, channel, message) = cmd {
-            if let Err(e) = handle_privmsg(state, nick, &channel, message).await {
-                state
-                    .client
-                    .privmsg(&channel, &format!("Error: {}", e))
-                    .await?;
+    let mut stream = state.client.stream()?;
+    while let Some(message) = stream.next().await.transpose()? {
+        if let Command::PRIVMSG(ref origin, content) = message.command {
+            if origin.is_channel_name() {
+                if let Some(author) = message.prefix.as_ref().and_then(|p| match p {
+                    Prefix::Nickname(name, _, _) => Some(&name[..]),
+                    _ => None,
+                }) {
+                    if let Err(e) = handle_privmsg(state, author, origin, content).await {
+                        state
+                            .client
+                            .send_privmsg(origin, &format!("Error: {}", e))?;
+                    }
+                } else {
+                    tracing::warn!("Couldn't get the author for a message");
+                }
             }
         }
     }
@@ -187,35 +207,35 @@ fn separate_to_space(str: &str, prefix_len: usize) -> (&str, Option<&str>) {
 
 async fn handle_privmsg(
     state: &mut AppState,
-    nick: String,
-    channel: &str,
-    message: String,
+    author: &str,
+    origin: &str,
+    content: String,
 ) -> anyhow::Result<()> {
-    if !message.starts_with(state.prefix.as_str()) {
-        if let Some(titlebot_msg) = state.titlebot.resolve(&message).await? {
-            state.client.privmsg(&channel, &titlebot_msg).await?;
+    if !content.starts_with(state.prefix.as_str()) {
+        if let Some(titlebot_msg) = state.titlebot.resolve(&content).await? {
+            state.client.send_privmsg(origin, &titlebot_msg)?;
         }
 
-        if let Some(prev_msg) = state.last_msgs.get(&nick) {
-            if let Some(formatted) = sed::resolve(prev_msg, &message)? {
+        if let Some(prev_msg) = state.last_msgs.get(author) {
+            if let Some(formatted) = sed::resolve(prev_msg, &content)? {
                 let mut result = ArrayString::<512>::new();
-                write!(result, "<{}> {}", nick, formatted)?;
-                state.client.privmsg(&channel, &result).await?;
-                state.last_msgs.insert(nick, formatted.to_string());
+                write!(result, "<{}> {}", author, formatted)?;
+                state.client.send_privmsg(origin, &result)?;
+                state.last_msgs.insert(author.into(), formatted.to_string());
                 return Ok(());
             }
         }
 
-        state.last_msgs.insert(nick, message);
+        state.last_msgs.insert(author.into(), content);
         return Ok(());
     }
-    let (command, remainder) = separate_to_space(&message, state.prefix.len());
+    let (command, remainder) = separate_to_space(&content, state.prefix.len());
     tracing::debug!("Command received ({:?}; {:?})", command, remainder);
 
     match command {
         "help" => {
             for help_line in HELP {
-                state.client.privmsg(&channel, help_line).await?;
+                state.client.send_privmsg(origin, help_line)?;
             }
         }
         "waifu" => {
@@ -225,76 +245,72 @@ async fn handle_privmsg(
                 .as_ref()
                 .map(|v| v.as_str())
                 .unwrap_or("Invalid category. Valid categories: https://waifu.pics/docs");
-            state.client.privmsg(&channel, response).await?;
+            state.client.send_privmsg(origin, response)?;
         }
         "mock" => {
-            misc::execute_leek(
+            leek::execute_leek(
                 state,
-                LeekCommand::Mock,
-                channel,
-                remainder.unwrap_or(&nick),
-            )
-            .await?;
+                leek::LeekCommand::Mock,
+                origin,
+                remainder.unwrap_or(author),
+            )?;
         }
         "leet" => {
-            misc::execute_leek(
+            leek::execute_leek(
                 state,
-                LeekCommand::Leet,
-                channel,
-                remainder.unwrap_or(&nick),
-            )
-            .await?;
+                leek::LeekCommand::Leet,
+                origin,
+                remainder.unwrap_or(author),
+            )?;
         }
         "owo" => {
-            misc::execute_leek(state, LeekCommand::Owo, channel, remainder.unwrap_or(&nick))
-                .await?;
+            leek::execute_leek(
+                state,
+                leek::LeekCommand::Owo,
+                origin,
+                remainder.unwrap_or(author),
+            )?;
         }
         "ev" => {
-            let result = misc::mathbot(nick, remainder, &mut state.last_eval)?;
-            state.client.privmsg(&channel, &result).await?;
+            let result = misc::mathbot(author.into(), remainder, &mut state.last_eval)?;
+            state.client.send_privmsg(origin, &result)?;
         }
         "grab" => {
             if let Some(target) = remainder {
-                if target == nick {
+                if target == author {
                     state
                         .client
-                        .privmsg(&channel, "You can't grab yourself")
-                        .await?;
+                        .send_privmsg(target, "You can't grab yourself")?;
                     return Ok(());
                 }
                 if let Some(prev_msg) = state.last_msgs.get(target) {
                     if state.db.add_quote(prev_msg.clone(), target.into()).await {
-                        state.client.privmsg(&channel, "Quote added").await?;
+                        state.client.send_privmsg(target, "Quote added")?;
                     } else {
                         state
                             .client
-                            .privmsg(&channel, "A database error has occurred")
-                            .await?;
+                            .send_privmsg(target, "A database error has occurred")?;
                     }
                 } else {
                     state
                         .client
-                        .privmsg(&channel, "No previous messages to grab")
-                        .await?;
+                        .send_privmsg(target, "No previous messages to grab")?;
                 }
             } else {
-                state
-                    .client
-                    .privmsg(&channel, "No nickname to grab")
-                    .await?;
+                state.client.send_privmsg(origin, "No nickname to grab")?;
             }
         }
         "quot" => {
             if let Some(quote) = state.db.get_quote(remainder.map(|v| v.to_string())).await {
                 let mut resp = ArrayString::<512>::new();
                 write!(resp, "\"{}\" ~{}", quote.0, quote.1)?;
-                state.client.privmsg(&channel, &resp).await?;
+                state.client.send_privmsg(origin, &resp)?;
             } else {
-                state.client.privmsg(&channel, "No quotes found").await?;
+                state.client.send_privmsg(origin, "No quotes found")?;
             }
         }
         _ => {
-            state.client.privmsg(&channel, "Unknown command").await?;
+            state.client.send_privmsg(origin, "Unknown command")?;
         }
     }
     Ok(())

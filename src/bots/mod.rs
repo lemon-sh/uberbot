@@ -1,4 +1,3 @@
-pub mod git;
 pub mod leek;
 pub mod misc;
 pub mod sed;

@@ -4,13 +4,6 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt::Write;
 
-#[derive(Debug)]
-pub enum LeekCommand {
-    Owo,
-    Leet,
-    Mock,
-}
-
 pub async fn get_waifu_pic(category: &str) -> anyhow::Result<Option<String>> {
     let api_resp = reqwest::get(format!("https://api.waifu.pics/sfw/{}", category))
         .await?
@@ -39,30 +32,4 @@ pub fn mathbot(
     } else {
         Ok(ArrayString::from("No expression to evaluate")?)
     }
-}
-
-pub async fn execute_leek(
-    state: &mut crate::AppState,
-    cmd: LeekCommand,
-    channel: &str,
-    nick: &str,
-) -> anyhow::Result<()> {
-    match state.last_msgs.get(nick) {
-        Some(msg) => {
-            tracing::debug!("Executing {:?} on {:?}", cmd, msg);
-            let output = match cmd {
-                LeekCommand::Owo => super::leek::owoify(msg)?,
-                LeekCommand::Leet => super::leek::leetify(msg)?,
-                LeekCommand::Mock => super::leek::mock(msg)?,
-            };
-            state.client.privmsg(channel, &output).await?;
-        }
-        None => {
-            state
-                .client
-                .privmsg(channel, "No last messages found.")
-                .await?;
-        }
-    }
-    Ok(())
 }
