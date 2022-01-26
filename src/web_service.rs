@@ -17,31 +17,48 @@ pub async fn run(
     let quote_get = warp::path("quotes")
         .and(warp::get())
         .and(warp::any().map(move || db.clone()))
-        .then(handle_get_quote);
+        .map(handle_get_quote);
 
     let webhook_post = warp::path("webhook")
         .and(warp::post())
         .and(warp::body::json())
         .and(warp::any().map(move || wh_irc.clone()))
         .and(warp::any().map(move || wh_channel.clone()))
-        .then(handle_webhook);
+        .map(handle_webhook);
 
     let filter = quote_get.or(webhook_post);
     warp::serve(filter).bind_with_graceful_shutdown(listen, async move {
         let _ = cancel.recv().await;
     }).1.await;
-    tracing::info!("Web service finished")
+    tracing::info!("Web service finished");
 }
 
-async fn handle_get_quote(_: ExecutorConnection) -> impl Reply {
+fn handle_get_quote(_: ExecutorConnection) -> impl Reply {
     reply::html(include_str!("res/quote_tmpl.html"))
 }
 
-async fn handle_webhook(json: serde_json::Value, irc: Arc<Client>, channel: String) -> impl Reply {
+#[allow(clippy::needless_pass_by_value)]
+fn handle_webhook(json: serde_json::Value, irc: Arc<Client>, channel: String) -> impl Reply {
     if json["commits"] != Null {
         let commits = json["commits"].as_array().unwrap();
         let repo = &json["repository"]["full_name"].as_str().unwrap().trim();
-        if commits.len() != 1 {
+        if commits.len() == 1 {
+            let author = &json["commits"][0]["author"]["name"]
+                .as_str()
+                .unwrap()
+                .trim();
+            let message = &json["commits"][0]["message"].as_str().unwrap().trim();
+            if let Err(e) = irc.send_privmsg(
+                channel,
+                format!("New commit on {}: {} - {}", repo, message, author),
+            ) {
+                return reply::with_status(
+                    format!("An error has occurred: {}", e),
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .into_response();
+            }
+        } else {
             if let Err(e) = irc.send_privmsg(
                 channel.clone(),
                 format!("{} new commits on {}:", commits.len(), repo),
@@ -64,22 +81,6 @@ async fn handle_webhook(json: serde_json::Value, irc: Arc<Client>, channel: Stri
                     )
                     .into_response();
                 }
-            }
-        } else {
-            let author = &json["commits"][0]["author"]["name"]
-                .as_str()
-                .unwrap()
-                .trim();
-            let message = &json["commits"][0]["message"].as_str().unwrap().trim();
-            if let Err(e) = irc.send_privmsg(
-                channel,
-                format!("New commit on {}: {} - {}", repo, message, author),
-            ) {
-                return reply::with_status(
-                    format!("An error has occurred: {}", e),
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                )
-                .into_response();
             }
         }
     }

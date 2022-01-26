@@ -1,3 +1,5 @@
+#![allow(clippy::match_wildcard_for_single_variants)]
+
 use std::fmt::Write;
 use std::fs::File;
 use std::io::Read;
@@ -154,7 +156,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let message_loop_task = tokio::spawn(async move {
         if let Err(e) = message_loop(state).await {
-            let _ = etx.send(e);
+            let _err = etx.send(e);
         }
     });
 
@@ -219,6 +221,7 @@ fn separate_to_space(str: &str, prefix_len: usize) -> (&str, Option<&str>) {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 async fn handle_privmsg(
     state: &mut AppState,
     author: &str,
@@ -255,32 +258,30 @@ async fn handle_privmsg(
         "waifu" => {
             let category = remainder.unwrap_or("waifu");
             let url = misc::get_waifu_pic(category).await?;
-            let response = url
-                .as_ref()
-                .map(|v| v.as_str())
+            let response = url.as_deref()
                 .unwrap_or("Invalid category. Valid categories: https://waifu.pics/docs");
             state.client.send_privmsg(origin, response)?;
         }
         "mock" => {
-            leek::execute_leek(
+            leek::execute(
                 state,
-                leek::LeekCommand::Mock,
+                leek::Command::Mock,
                 origin,
                 remainder.unwrap_or(author),
             )?;
         }
         "leet" => {
-            leek::execute_leek(
+            leek::execute(
                 state,
-                leek::LeekCommand::Leet,
+                leek::Command::Leet,
                 origin,
                 remainder.unwrap_or(author),
             )?;
         }
         "owo" => {
-            leek::execute_leek(
+            leek::execute(
                 state,
-                leek::LeekCommand::Owo,
+                leek::Command::Owo,
                 origin,
                 remainder.unwrap_or(author),
             )?;
@@ -315,7 +316,7 @@ async fn handle_privmsg(
             }
         }
         "quot" => {
-            if let Some(quote) = state.db.get_quote(remainder.map(|v| v.to_string())).await {
+            if let Some(quote) = state.db.get_quote(remainder.map(ToString::to_string)).await {
                 let mut resp = ArrayString::<512>::new();
                 write!(resp, "\"{}\" ~{}", quote.0, quote.1)?;
                 state.client.send_privmsg(origin, &resp)?;

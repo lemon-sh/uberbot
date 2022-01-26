@@ -5,6 +5,7 @@ use fancy_regex::Regex;
 use lazy_static::lazy_static;
 use sedregex::find_and_replace;
 
+#[allow(clippy::module_name_repetitions)]
 #[derive(Debug)]
 pub enum SedError {
     Capacity(CapacityError),
@@ -52,7 +53,7 @@ pub fn resolve(prev_msg: &str, cmd: &str) -> SedResult {
     if RE.is_match(cmd)? {
         return if let Some(mat) = RE.find(cmd)? {
             let slice = &cmd[mat.start()..mat.end()];
-            let formatted = find_and_replace(&prev_msg, [slice])?;
+            let formatted = find_and_replace(prev_msg, [slice])?;
             Ok(Some(ArrayString::from(&formatted)?))
         } else {
             Ok(None)

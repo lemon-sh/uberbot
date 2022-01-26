@@ -101,7 +101,7 @@ impl Titlebot {
     }
 
     pub async fn resolve(&mut self, message: &str) -> anyhow::Result<Option<String>> {
-        if let Some(m) = self.spotify_regex.captures(&message)? {
+        if let Some(m) = self.spotify_regex.captures(message)? {
             tracing::debug!("{}", message);
             let tp_group = m.get(1).unwrap();
             let id_group = m.get(2).unwrap();
@@ -114,7 +114,7 @@ impl Titlebot {
                 )
                 .await?,
             ));
-        } else if let Some(m) = self.url_regex.find(&message)? {
+        } else if let Some(m) = self.url_regex.find(message)? {
             let url = &message[m.start()..m.end()];
             tracing::debug!("url: {}", url);
 

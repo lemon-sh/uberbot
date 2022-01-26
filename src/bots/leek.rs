@@ -1,4 +1,4 @@
-use arrayvec::{ArrayString, CapacityError};
+use arrayvec::{ArrayString};
 use rand::Rng;
 use std::{
     error::Error,
@@ -6,25 +6,25 @@ use std::{
 };
 
 #[derive(Debug)]
-pub struct LeekCapacityError(CapacityError);
+pub struct CapacityError(arrayvec::CapacityError);
 
-impl Display for LeekCapacityError {
+impl Display for CapacityError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(&self.0, f)
     }
 }
 
-impl Error for LeekCapacityError {}
+impl Error for CapacityError {}
 
-impl<T> From<CapacityError<T>> for LeekCapacityError {
-    fn from(e: CapacityError<T>) -> Self {
-        Self { 0: e.simplify() }
+impl<T> From<arrayvec::CapacityError<T>> for CapacityError {
+    fn from(e: arrayvec::CapacityError<T>) -> Self {
+        Self(e.simplify())
     }
 }
 
-type LeekResult = Result<ArrayString<512>, LeekCapacityError>;
+type LeekResult = Result<ArrayString<512>, CapacityError>;
 
-fn mock(input: &str) -> LeekResult {
+fn mock(input: &str) -> ArrayString<512> {
     let mut builder = ArrayString::<512>::new();
 
     for ch in input.chars() {
@@ -35,10 +35,10 @@ fn mock(input: &str) -> LeekResult {
         }
     }
 
-    Ok(builder)
+    builder
 }
 
-fn leetify(input: &str) -> LeekResult {
+fn leetify(input: &str) -> ArrayString<512> {
     let mut builder = ArrayString::<512>::new();
 
     for ch in input.chars() {
@@ -55,7 +55,7 @@ fn leetify(input: &str) -> LeekResult {
         });
     }
 
-    Ok(builder)
+    builder
 }
 
 fn owoify(input: &str) -> LeekResult {
@@ -102,16 +102,16 @@ fn owoify(input: &str) -> LeekResult {
     Ok(builder)
 }
 
-#[derive(Debug)]
-pub enum LeekCommand {
+#[derive(Debug, Clone, Copy)]
+pub enum Command {
     Owo,
     Leet,
     Mock,
 }
 
-pub fn execute_leek(
+pub fn execute(
     state: &mut crate::AppState,
-    cmd: LeekCommand,
+    cmd: Command,
     target: &str,
     nick: &str,
 ) -> anyhow::Result<()> {
@@ -119,9 +119,9 @@ pub fn execute_leek(
         Some(msg) => {
             tracing::debug!("Executing {:?} on {:?}", cmd, msg);
             let output = match cmd {
-                LeekCommand::Owo => super::leek::owoify(msg)?,
-                LeekCommand::Leet => super::leek::leetify(msg)?,
-                LeekCommand::Mock => super::leek::mock(msg)?,
+                Command::Owo => super::leek::owoify(msg)?,
+                Command::Leet => super::leek::leetify(msg),
+                Command::Mock => super::leek::mock(msg),
             };
             state.client.send_privmsg(target, &output)?;
         }
