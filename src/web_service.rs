@@ -4,8 +4,20 @@ use reqwest::StatusCode;
 use serde_json::Value::Null;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use handlebars::Handlebars;
+use lazy_static::lazy_static;
 use tokio::sync::broadcast::Receiver;
 use warp::{reply, Filter, Reply};
+use serde::Serialize;
+use crate::database::Quote;
+
+lazy_static! {
+    static ref HANDLEBARS: Handlebars<'static> = {
+        let mut reg = Handlebars::new();
+        reg.register_template_string("quotes", include_str!("res/quote_tmpl.hbs")).unwrap();
+        reg
+    };
+}
 
 pub async fn run(
     db: ExecutorConnection,
@@ -33,8 +45,24 @@ pub async fn run(
     tracing::info!("Web service finished");
 }
 
+#[derive(Serialize)]
+struct QuotesTemplate {
+    quotes: Option<Vec<Quote>>
+}
+
 fn handle_get_quote(_: ExecutorConnection) -> impl Reply {
-    reply::html(include_str!("res/quote_tmpl.html"))
+    match HANDLEBARS.render("quotes", &QuotesTemplate{quotes: Some(vec![
+        Quote{quote:"something".into(),author:"by someone".into()},
+        Quote{quote:"something different".into(),author:"by someone else".into()},
+        Quote{quote:"something even more different".into(),author:"by nobody".into()}
+    ])}) {
+        Ok(o) => reply::html(o).into_response(),
+        Err(e) => {
+            tracing::warn!("Error while rendering template: {}", e);
+            reply::with_status("Failed to render template", StatusCode::INTERNAL_SERVER_ERROR).into_response()
+        }
+    }
+
 }
 
 #[allow(clippy::needless_pass_by_value)]

@@ -20,7 +20,7 @@ use tokio::sync::mpsc::{unbounded_channel};
 use tracing_subscriber::EnvFilter;
 
 use crate::bots::{leek, misc, sed, title};
-use crate::database::{DbExecutor, ExecutorConnection};
+use crate::database::{DbExecutor, ExecutorConnection, Quote};
 
 mod bots;
 mod database;
@@ -299,7 +299,7 @@ async fn handle_privmsg(
                     return Ok(());
                 }
                 if let Some(prev_msg) = state.last_msgs.get(target) {
-                    if state.db.add_quote(prev_msg.clone(), target.into()).await {
+                    if state.db.add_quote(Quote{quote:prev_msg.clone(), author:target.into()}).await {
                         state.client.send_privmsg(target, "Quote added")?;
                     } else {
                         state
@@ -318,7 +318,7 @@ async fn handle_privmsg(
         "quot" => {
             if let Some(quote) = state.db.get_quote(remainder.map(ToString::to_string)).await {
                 let mut resp = ArrayString::<512>::new();
-                write!(resp, "\"{}\" ~{}", quote.0, quote.1)?;
+                write!(resp, "\"{}\" ~{}", quote.quote, quote.author)?;
                 state.client.send_privmsg(origin, &resp)?;
             } else {
                 state.client.send_privmsg(origin, "No quotes found")?;
