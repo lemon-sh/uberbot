@@ -2,46 +2,37 @@ use crate::ExecutorConnection;
 use serde_json::Value::Null;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::Sender;
-use warp::Filter;
+use warp::{Filter, Reply, reply};
 
 pub async fn run(
     db: ExecutorConnection,
-    tx: Sender<String>,
+    webhook_tx: Sender<String>,
     listen: SocketAddr,
 ) -> anyhow::Result<()> {
-    let db_filter = warp::any().map(move || db.clone());
-    let db_filter = warp::get().and(db_filter).and_then(handle);
+    let quote_get = warp::get()
+        .and(warp::get())
+        .and(warp::any().map(move || db.clone()))
+        .then(handle_get_quote);
 
-    let tx_filter = warp::any().map(move || tx.clone());
-    let tx_filter = warp::path("webhook")
+    let webhook_post = warp::path("webhook")
         .and(warp::post())
         .and(warp::body::json())
-        .and(tx_filter)
-        .and_then(handle_webhook);
+        .and(warp::any().map(move || webhook_tx.clone()))
+        .then(handle_webhook);
 
-    let filter = db_filter.or(tx_filter);
+    let filter = quote_get.or(webhook_post);
     warp::serve(filter).run(listen).await;
     Ok(())
 }
 
-async fn handle(db: ExecutorConnection) -> Result<impl warp::Reply, warp::Rejection> {
-    if let Some((a, b)) = db.get_quote(None).await {
-        Ok(warp::reply::with_status(
-            format!("{} {}", a, b),
-            warp::http::StatusCode::OK,
-        ))
-    } else {
-        Ok(warp::reply::with_status(
-            "None".into(),
-            warp::http::StatusCode::NO_CONTENT,
-        ))
-    }
+async fn handle_get_quote(_: ExecutorConnection) -> impl Reply {
+    reply::html(include_str!("res/quote_tmpl.html"))
 }
 
-pub async fn handle_webhook(
+async fn handle_webhook(
     json: serde_json::Value,
     tx: Sender<String>,
-) -> Result<impl warp::Reply, warp::Rejection> {
+) -> impl Reply {
     if json["commits"] != Null {
         let commits = json["commits"].as_array().unwrap();
         let repo = &json["repository"]["full_name"].as_str().unwrap().trim();
@@ -67,6 +58,5 @@ pub async fn handle_webhook(
                 .expect("Failed to send string to main thread");
         }
     }
-
-    Ok(warp::reply::with_status("Ok", warp::http::StatusCode::OK))
+    warp::reply::with_status("Ok", warp::http::StatusCode::OK)
 }
