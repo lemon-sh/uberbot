@@ -1,20 +1,21 @@
+use crate::database::Quote;
 use crate::ExecutorConnection;
+use handlebars::Handlebars;
 use irc::client::Client;
+use lazy_static::lazy_static;
 use reqwest::StatusCode;
+use serde::{Deserialize, Serialize};
 use serde_json::Value::Null;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use handlebars::Handlebars;
-use lazy_static::lazy_static;
 use tokio::sync::broadcast::Receiver;
 use warp::{reply, Filter, Reply};
-use serde::Serialize;
-use crate::database::Quote;
 
 lazy_static! {
     static ref HANDLEBARS: Handlebars<'static> = {
         let mut reg = Handlebars::new();
-        reg.register_template_string("quotes", include_str!("res/quote_tmpl.hbs")).unwrap();
+        reg.register_template_string("quotes", include_str!("res/quote_tmpl.hbs"))
+            .unwrap();
         reg
     };
 }
@@ -24,12 +25,13 @@ pub async fn run(
     wh_irc: Arc<Client>,
     wh_channel: String,
     listen: SocketAddr,
-    mut cancel: Receiver<()>
+    mut cancel: Receiver<()>,
 ) {
-    let quote_get = warp::path("quotes")
-        .and(warp::get())
+    let quote_get = warp::get()
+        .and(warp::path("quotes"))
+        .and(warp::query::<QuotesQuery>())
         .and(warp::any().map(move || db.clone()))
-        .map(handle_get_quote);
+        .then(handle_get_quote);
 
     let webhook_post = warp::path("webhook")
         .and(warp::post())
@@ -38,31 +40,58 @@ pub async fn run(
         .and(warp::any().map(move || wh_channel.clone()))
         .map(handle_webhook);
 
-    let filter = quote_get.or(webhook_post);
-    warp::serve(filter).bind_with_graceful_shutdown(listen, async move {
-        let _ = cancel.recv().await;
-    }).1.await;
+    let routes = webhook_post.or(quote_get);
+    warp::serve(routes)
+        .bind_with_graceful_shutdown(listen, async move {
+            let _ = cancel.recv().await;
+        })
+        .1
+        .await;
     tracing::info!("Web service finished");
 }
 
 #[derive(Serialize)]
 struct QuotesTemplate {
-    quotes: Option<Vec<Quote>>
+    quotes: Option<Vec<Quote>>,
+    flash: Option<String>,
 }
 
-fn handle_get_quote(_: ExecutorConnection) -> impl Reply {
-    match HANDLEBARS.render("quotes", &QuotesTemplate{quotes: Some(vec![
-        Quote{quote:"something".into(),author:"by someone".into()},
-        Quote{quote:"something different".into(),author:"by someone else".into()},
-        Quote{quote:"something even more different".into(),author:"by nobody".into()}
-    ])}) {
+#[derive(Deserialize)]
+struct QuotesQuery {
+    query: Option<String>,
+}
+
+async fn handle_get_quote(query: QuotesQuery, db: ExecutorConnection) -> impl Reply {
+    let template = if let Some(query) = query.query {
+        if let Some(quotes) = db.search(query.clone()).await {
+            let quotes_count = quotes.len();
+            QuotesTemplate {
+                quotes: Some(quotes),
+                flash: Some(format!("Displaying {}/50 results for query \"{}\"", quotes_count, query)),
+            }
+        } else {
+            QuotesTemplate {
+                quotes: None,
+                flash: Some("A database error has occurred".into()),
+            }
+        }
+    } else {
+        QuotesTemplate {
+            quotes: None,
+            flash: None,
+        }
+    };
+    match HANDLEBARS.render("quotes", &template) {
         Ok(o) => reply::html(o).into_response(),
         Err(e) => {
             tracing::warn!("Error while rendering template: {}", e);
-            reply::with_status("Failed to render template", StatusCode::INTERNAL_SERVER_ERROR).into_response()
+            reply::with_status(
+                "Failed to render template",
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )
+            .into_response()
         }
     }
-
 }
 
 #[allow(clippy::needless_pass_by_value)]

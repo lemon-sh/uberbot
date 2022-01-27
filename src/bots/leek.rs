@@ -1,4 +1,4 @@
-use arrayvec::{ArrayString};
+use arrayvec::ArrayString;
 use rand::Rng;
 use std::{
     error::Error,

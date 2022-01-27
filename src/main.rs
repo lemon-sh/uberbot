@@ -16,7 +16,7 @@ use irc::proto::{ChannelExt, Command, Prefix};
 use rspotify::Credentials;
 use serde::Deserialize;
 use tokio::sync::broadcast;
-use tokio::sync::mpsc::{unbounded_channel};
+use tokio::sync::mpsc::unbounded_channel;
 use tracing_subscriber::EnvFilter;
 
 use crate::bots::{leek, misc, sed, title};
@@ -142,7 +142,7 @@ async fn main() -> anyhow::Result<()> {
         client.clone(),
         client_config.git_channel,
         http_listen,
-        ctx.subscribe()
+        ctx.subscribe(),
     ));
 
     let state = AppState {
@@ -258,7 +258,8 @@ async fn handle_privmsg(
         "waifu" => {
             let category = remainder.unwrap_or("waifu");
             let url = misc::get_waifu_pic(category).await?;
-            let response = url.as_deref()
+            let response = url
+                .as_deref()
                 .unwrap_or("Invalid category. Valid categories: https://waifu.pics/docs");
             state.client.send_privmsg(origin, response)?;
         }
@@ -299,7 +300,14 @@ async fn handle_privmsg(
                     return Ok(());
                 }
                 if let Some(prev_msg) = state.last_msgs.get(target) {
-                    if state.db.add_quote(Quote{quote:prev_msg.clone(), author:target.into()}).await {
+                    if state
+                        .db
+                        .add_quote(Quote {
+                            quote: prev_msg.clone(),
+                            author: target.into(),
+                        })
+                        .await
+                    {
                         state.client.send_privmsg(target, "Quote added")?;
                     } else {
                         state
