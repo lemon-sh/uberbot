@@ -1,4 +1,4 @@
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, OptionalExtension, Params};
 use serde::Serialize;
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
@@ -10,7 +10,7 @@ enum Task {
     AddQuote(oneshot::Sender<bool>, Quote),
     GetQuote(oneshot::Sender<Option<Quote>>, Option<String>),
     Search(oneshot::Sender<Option<Vec<Quote>>>, String),
-    Random20(oneshot::Sender<Option<Vec<Quote>>>)
+    Random20(oneshot::Sender<Option<Vec<Quote>>>),
 }
 
 pub struct DbExecutor {
@@ -63,32 +63,36 @@ impl DbExecutor {
                     tx.send(quote).unwrap();
                 }
                 Task::Search(tx, query) => {
-                    tx.send(match self.db
-                        .prepare("select quote,username from quotes where quote like '%'||?1||'%' order by quote asc limit 50")
-                        .and_then(|mut v| v.query(params![query])
-                            .and_then(|mut v| {
-                                let mut quotes: Vec<Quote> = Vec::with_capacity(50);
-                                while let Some(row) = v.next()? {
-                                    quotes.push(Quote {
-                                        quote: row.get(0)?,
-                                        author: row.get(1)?,
-                                    });
-                                }
-                                Ok(quotes)
-                            }))
-                    {
-                        Ok(o) => {
-                            Some(o)
-                        }
-                        Err(e) => {
-                            tracing::error!("A database error has occurred: {}", e);
-                            None
-                        }
-                    }).unwrap();
+                    tx.send(self.yield_quotes("select quote,username from quotes where quote like '%'||?1||'%' order by quote asc limit 50", params![query])).unwrap();
                 }
                 Task::Random20(tx) => {
-                    tx.send(None).unwrap();
+                    tx.send(self.yield_quotes(
+                        "select quote,username from quotes order by random() limit 20",
+                        params![],
+                    ))
+                    .unwrap();
                 }
+            }
+        }
+    }
+
+    fn yield_quotes<P: Params>(&self, sql: &str, params: P) -> Option<Vec<Quote>> {
+        match self.db.prepare(sql).and_then(|mut v| {
+            v.query(params).and_then(|mut v| {
+                let mut quotes: Vec<Quote> = Vec::with_capacity(50);
+                while let Some(row) = v.next()? {
+                    quotes.push(Quote {
+                        quote: row.get(0)?,
+                        author: row.get(1)?,
+                    });
+                }
+                Ok(quotes)
+            })
+        }) {
+            Ok(o) => Some(o),
+            Err(e) => {
+                tracing::error!("A database error has occurred: {}", e);
+                None
             }
         }
     }
@@ -107,13 +111,20 @@ impl Clone for ExecutorConnection {
 }
 
 macro_rules! executor_wrapper {
-  ($name:ident, $task:expr, $ret:ty, $($arg:ident: $ty:ty),*) => {
-    pub async fn $name(&self, $($arg: $ty),*) -> $ret {
-      let (otx, orx) = oneshot::channel();
-      self.tx.send($task(otx, $($arg),*)).unwrap();
-      orx.await.unwrap()
-    }
-  }
+    ($name:ident, $task:expr, $ret:ty, $($arg:ident: $ty:ty),*) => {
+        pub async fn $name(&self, $($arg: $ty),*) -> $ret {
+          let (otx, orx) = oneshot::channel();
+          self.tx.send($task(otx, $($arg),*)).unwrap();
+          orx.await.unwrap()
+        }
+    };
+    ($name:ident, $task:expr, $ret:ty) => {
+        pub async fn $name(&self) -> $ret {
+          let (otx, orx) = oneshot::channel();
+          self.tx.send($task(otx)).unwrap();
+          orx.await.unwrap()
+        }
+    };
 }
 
 impl ExecutorConnection {
@@ -125,5 +136,11 @@ impl ExecutorConnection {
         Option<Quote>,
         author: Option<String>
     );
-    executor_wrapper!(search, Task::Search, Option<Vec<Quote>>, query: String);
+    executor_wrapper!(
+        search,
+        Task::Search,
+        Option<Vec<Quote>>,
+        query: String
+    );
+    executor_wrapper!(random20, Task::Random20, Option<Vec<Quote>>);
 }

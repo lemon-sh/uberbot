@@ -58,16 +58,19 @@ struct QuotesTemplate {
 
 #[derive(Deserialize)]
 struct QuotesQuery {
-    query: Option<String>,
+    q: Option<String>
 }
 
 async fn handle_get_quote(query: QuotesQuery, db: ExecutorConnection) -> impl Reply {
-    let template = if let Some(query) = query.query {
-        if let Some(quotes) = db.search(query.clone()).await {
+    let template = if let Some(q) = query.q {
+        if let Some(quotes) = db.search(q.clone()).await {
             let quotes_count = quotes.len();
             QuotesTemplate {
                 quotes: Some(quotes),
-                flash: Some(format!("Displaying {}/50 results for query \"{}\"", quotes_count, query)),
+                flash: Some(format!(
+                    "Displaying {}/50 results for query \"{}\"",
+                    quotes_count, q
+                )),
             }
         } else {
             QuotesTemplate {
@@ -77,8 +80,8 @@ async fn handle_get_quote(query: QuotesQuery, db: ExecutorConnection) -> impl Re
         }
     } else {
         QuotesTemplate {
-            quotes: None,
-            flash: None,
+            quotes: db.random20().await,
+            flash: Some("Displaying up to 20 random quotes".into()),
         }
     };
     match HANDLEBARS.render("quotes", &template) {

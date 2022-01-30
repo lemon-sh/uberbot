@@ -296,7 +296,7 @@ async fn handle_privmsg(
                 if target == author {
                     state
                         .client
-                        .send_privmsg(target, "You can't grab yourself")?;
+                        .send_privmsg(origin, "You can't grab yourself")?;
                     return Ok(());
                 }
                 if let Some(prev_msg) = state.last_msgs.get(target) {
@@ -308,16 +308,16 @@ async fn handle_privmsg(
                         })
                         .await
                     {
-                        state.client.send_privmsg(target, "Quote added")?;
+                        state.client.send_privmsg(origin, "Quote added")?;
                     } else {
                         state
                             .client
-                            .send_privmsg(target, "A database error has occurred")?;
+                            .send_privmsg(origin, "A database error has occurred")?;
                     }
                 } else {
                     state
                         .client
-                        .send_privmsg(target, "No previous messages to grab")?;
+                        .send_privmsg(origin, "No previous messages to grab")?;
                 }
             } else {
                 state.client.send_privmsg(origin, "No nickname to grab")?;
