@@ -136,11 +136,6 @@ impl ExecutorConnection {
         Option<Quote>,
         author: Option<String>
     );
-    executor_wrapper!(
-        search,
-        Task::Search,
-        Option<Vec<Quote>>,
-        query: String
-    );
+    executor_wrapper!(search, Task::Search, Option<Vec<Quote>>, query: String);
     executor_wrapper!(random20, Task::Random20, Option<Vec<Quote>>);
 }

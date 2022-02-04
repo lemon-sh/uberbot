@@ -27,7 +27,7 @@ rusqlite = { version = "0.26", features = ["bundled"] }
 warp = "0.3"
 futures-util = "0.3"
 irc = { version = "0.15", default-features = false }
-handlebars = "4.2"
+tera = { version = "1.15", default-features = false }
 
 [features]
 tls = ["irc/tls-rust"]

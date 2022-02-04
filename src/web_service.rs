@@ -1,6 +1,5 @@
 use crate::database::Quote;
 use crate::ExecutorConnection;
-use handlebars::Handlebars;
 use irc::client::Client;
 use lazy_static::lazy_static;
 use reqwest::StatusCode;
@@ -8,16 +7,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value::Null;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tera::{Context, Tera};
 use tokio::sync::broadcast::Receiver;
 use warp::{reply, Filter, Reply};
 
 lazy_static! {
-    static ref HANDLEBARS: Handlebars<'static> = {
-        let mut reg = Handlebars::new();
-        reg.register_template_string("quotes", include_str!("res/quote_tmpl.hbs"))
-            .unwrap();
-        reg
-    };
+    static ref TERA: Tera = Tera::new("templates/**/*").unwrap();
 }
 
 pub async fn run(
@@ -58,7 +53,7 @@ struct QuotesTemplate {
 
 #[derive(Deserialize)]
 struct QuotesQuery {
-    q: Option<String>
+    q: Option<String>,
 }
 
 async fn handle_get_quote(query: QuotesQuery, db: ExecutorConnection) -> impl Reply {
@@ -84,7 +79,7 @@ async fn handle_get_quote(query: QuotesQuery, db: ExecutorConnection) -> impl Re
             flash: Some("Displaying up to 20 random quotes".into()),
         }
     };
-    match HANDLEBARS.render("quotes", &template) {
+    match TERA.render("quotes.html", &Context::from_serialize(&template).unwrap()) {
         Ok(o) => reply::html(o).into_response(),
         Err(e) => {
             tracing::warn!("Error while rendering template: {}", e);
