@@ -15,6 +15,7 @@ use irc::client::{Client, ClientStream};
 use irc::proto::{ChannelExt, Command, Prefix};
 use rspotify::Credentials;
 use serde::Deserialize;
+use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::unbounded_channel;
 use tracing_subscriber::EnvFilter;
