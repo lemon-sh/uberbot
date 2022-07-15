@@ -1,19 +1,11 @@
-# IRC config
+[irc]
 host = "karx.xyz"
 port = 6697
 username = "uberbot"
 channels = ["#main", "#no-normies"]
 mode = "+B"
-
-# Spotify config
-spotify_client_id = ""
-spotify_client_secret = ""
-
-# Bot config
 prefix = "!"
 
-# Web service config
-http_listen = "127.0.0.1:8080"
-
-# Git webhook config
-git_channel = "#main"
+[spotify]
+spotify_client_id = ""
+spotify_client_secret = ""

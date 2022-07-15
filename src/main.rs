@@ -25,6 +25,8 @@ use crate::database::{DbExecutor, ExecutorConnection, Quote};
 
 mod bots;
 mod database;
+mod bot;
+mod config;
 
 // this will be displayed when the help command is used
 const HELP: &[&str] = &[
@@ -63,24 +65,6 @@ pub struct AppState {
     last_eval: HashMap<String, f64>,
     titlebot: title::Titlebot,
     db: ExecutorConnection,
-}
-
-#[derive(Deserialize)]
-struct ClientConf {
-    channels: Vec<String>,
-    host: String,
-    tls: bool,
-    mode: Option<String>,
-    nickname: Option<String>,
-    port: u16,
-    username: String,
-    spotify_client_id: String,
-    spotify_client_secret: String,
-    prefix: String,
-    db_path: Option<String>,
-    // reserved for future
-    _http_listen: Option<SocketAddr>,
-    _git_channel: String,
 }
 
 #[tokio::main]
