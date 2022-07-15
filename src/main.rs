@@ -161,7 +161,7 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    tokio::select! {
+    select! {
         _ = terminate_signal() => {
             tracing::info!("Received shutdown signal, sending QUIT message");
             client.send_quit("überbot shutting down")?;
