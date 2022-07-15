@@ -9,8 +9,8 @@ use tokio::sync::{
 enum Task {
     AddQuote(oneshot::Sender<bool>, Quote),
     GetQuote(oneshot::Sender<Option<Quote>>, Option<String>),
-    Search(oneshot::Sender<Option<Vec<Quote>>>, String),
-    Random20(oneshot::Sender<Option<Vec<Quote>>>),
+    SearchQuotes(oneshot::Sender<Option<Vec<Quote>>>, String),
+    RandomNQuotes(oneshot::Sender<Option<Vec<Quote>>>, u8),
 }
 
 pub struct DbExecutor {
@@ -29,8 +29,7 @@ impl DbExecutor {
         let (tx, rx) = unbounded_channel();
         let db = rusqlite::Connection::open(dbpath)?;
         db.execute(
-            "create table if not exists quotes(id integer primary key,\
-            username text not null, quote text not null)",
+            "create table if not exists quotes(id integer primary key, username text not null, quote text not null)",
             [],
         )?;
         tracing::debug!("Database connected ({})", dbpath);
@@ -62,13 +61,13 @@ impl DbExecutor {
                     });
                     tx.send(quote).unwrap();
                 }
-                Task::Search(tx, query) => {
-                    tx.send(self.yield_quotes("select quote,username from quotes where quote like '%'||?1||'%' order by quote asc limit 50", params![query])).unwrap();
+                Task::SearchQuotes(tx, query) => {
+                    tx.send(self.yield_quotes("select quote,username from quotes where quote like '%'||?1||'%' order by quote asc limit 5", params![query])).unwrap();
                 }
-                Task::Random20(tx) => {
+                Task::RandomNQuotes(tx, count) => {
                     tx.send(self.yield_quotes(
-                        "select quote,username from quotes order by random() limit 20",
-                        params![],
+                        "select quote,username from quotes order by random() limit ?",
+                        params![count],
                     ))
                     .unwrap();
                 }
@@ -136,6 +135,6 @@ impl ExecutorConnection {
         Option<Quote>,
         author: Option<String>
     );
-    executor_wrapper!(search, Task::Search, Option<Vec<Quote>>, query: String);
-    executor_wrapper!(random20, Task::Random20, Option<Vec<Quote>>);
+    executor_wrapper!(search_quotes, Task::SearchQuotes, Option<Vec<Quote>>, query: String);
+    executor_wrapper!(random_n_quotes, Task::RandomNQuotes, Option<Vec<Quote>>, count: u8);
 }

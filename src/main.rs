@@ -25,7 +25,6 @@ use crate::database::{DbExecutor, ExecutorConnection, Quote};
 
 mod bots;
 mod database;
-mod web_service;
 
 // this will be displayed when the help command is used
 const HELP: &[&str] = &[
@@ -79,8 +78,9 @@ struct ClientConf {
     spotify_client_secret: String,
     prefix: String,
     db_path: Option<String>,
-    http_listen: Option<SocketAddr>,
-    git_channel: String,
+    // reserved for future
+    _http_listen: Option<SocketAddr>,
+    _git_channel: String,
 }
 
 #[tokio::main]
@@ -138,14 +138,6 @@ async fn main() -> anyhow::Result<()> {
     let (ctx, _) = broadcast::channel(1);
     let (etx, mut erx) = unbounded_channel();
 
-    let web_task = tokio::spawn(web_service::run(
-        db_conn.clone(),
-        client.clone(),
-        client_config.git_channel,
-        http_listen,
-        ctx.subscribe(),
-    ));
-
     let state = AppState {
         prefix: client_config.prefix,
         client: client.clone(),
@@ -177,9 +169,6 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Closing services...");
     let _ = ctx.send(());
-    web_task
-        .await
-        .unwrap_or_else(|e| tracing::warn!("Couldn't join the web service: {:?}", e));
     message_loop_task
         .await
         .unwrap_or_else(|e| tracing::warn!("Couldn't join the web service: {:?}", e));

@@ -24,7 +24,5 @@ meval = "0.2"
 lazy_static = "1.4"
 sedregex = "0.2"
 rusqlite = { version = "0.28", features = ["bundled"] }
-warp = "0.3"
 futures-util = "0.3"
 irc = { version = "0.15", default-features = false, features = ["tls-rust"] }
-tera = { version = "1.15", default-features = false }
