@@ -44,7 +44,7 @@ fn leetify(input: &str) -> ArrayString<512> {
     let mut builder = ArrayString::<512>::new();
 
     for ch in input.chars() {
-        builder.push(match ch {
+        builder.push(match ch.to_ascii_lowercase() {
             'a' => '4',
             'e' => '3',
             'i' => '1',
@@ -111,9 +111,9 @@ enum LeekCommand {
     Mock,
 }
 
-fn execute_leek(cmd: LeekCommand, msg: &Message) -> anyhow::Result<String> {
+async fn execute_leek(cmd: LeekCommand, msg: &Message<'_>) -> anyhow::Result<String> {
     let nick = msg.content.unwrap_or(msg.author);
-    match msg.last_msg.get(nick) {
+    match msg.last_msg.read().await.get(nick) {
         Some(msg) => Ok(match cmd {
             LeekCommand::Owo => owoify(msg)?,
             LeekCommand::Leet => leetify(msg),
@@ -132,7 +132,7 @@ pub struct Mock;
 impl Command for Owo {
     //noinspection RsNeedlessLifetimes
     async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
-        execute_leek(LeekCommand::Owo, &msg)
+        execute_leek(LeekCommand::Owo, &msg).await
     }
 }
 
@@ -140,7 +140,7 @@ impl Command for Owo {
 impl Command for Leet {
     //noinspection RsNeedlessLifetimes
     async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
-        execute_leek(LeekCommand::Leet, &msg)
+        execute_leek(LeekCommand::Leet, &msg).await
     }
 }
 
@@ -148,6 +148,6 @@ impl Command for Leet {
 impl Command for Mock {
     //noinspection RsNeedlessLifetimes
     async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
-        execute_leek(LeekCommand::Mock, &msg)
+        execute_leek(LeekCommand::Mock, &msg).await
     }
 }

@@ -104,6 +104,12 @@ async fn main() -> anyhow::Result<()> {
     bot.add_command("help".into(), Help);
     bot.add_command("waifu".into(), Waifu);
     bot.add_command("owo".into(), Owo);
+    bot.add_trigger(Regex::new(r"^(?:(?<u>\S+):\s+)?s/(?<r>[^/]*)/(?<w>[^/]*)(?:/(?<f>[a-z]*))?\s*")?, Sed);
+    #[cfg(feature = "debug")]
+    {
+        use commands::debug::*;
+        bot.add_command("lastmsg".into(), LastMsg);
+    }
 
     let state = AppState {
         client: client.clone(),
