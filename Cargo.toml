@@ -1,6 +1,6 @@
 [package]
 name = "uberbot"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [profile.release]
@@ -26,3 +26,5 @@ sedregex = "0.2"
 rusqlite = { version = "0.28", features = ["bundled"] }
 futures-util = "0.3"
 irc = { version = "0.15", default-features = false, features = ["tls-rust"] }
+async-trait = "0.1"
+arg = "0.3"
