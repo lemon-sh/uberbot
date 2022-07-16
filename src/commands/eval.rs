@@ -8,11 +8,12 @@ pub struct Eval {
     last_eval: HashMap<String, f64>
 }
 
+#[async_trait]
 impl Command for Eval {
     //noinspection RsNeedlessLifetimes
     async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
         if let Some(expr) = msg.content {
-            let last_eval = self.last_eval.entry(author).or_insert(0.0);
+            let last_eval = self.last_eval.entry(msg.author.into()).or_insert(0.0);
             let mut meval_ctx = Context::new();
             let value = meval::eval_str_with_context(expr, meval_ctx.var("x", *last_eval))?;
             *last_eval = value;

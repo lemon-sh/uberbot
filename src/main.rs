@@ -1,5 +1,3 @@
-#![allow(clippy::match_wildcard_for_single_variants)]
-
 use std::env;
 use std::fs::File;
 use std::io::Read;
@@ -13,13 +11,16 @@ use futures_util::stream::StreamExt;
 use irc::client::prelude::Config;
 use irc::client::{Client, ClientStream};
 use irc::proto::{ChannelExt, Command, Prefix};
+use rspotify::Credentials;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::unbounded_channel;
 use tracing_subscriber::EnvFilter;
+use crate::commands::eval::Eval;
 use crate::commands::help::Help;
 use crate::commands::leek::Owo;
 use crate::commands::sed::Sed;
+use crate::commands::spotify::Spotify;
 
 use crate::config::UberConfig;
 use crate::database::{DbExecutor, ExecutorConnection};
@@ -69,10 +70,7 @@ async fn main() -> anyhow::Result<()> {
     let cfg: UberConfig = toml::from_str(&client_conf)?;
 
     let (db_exec, db_conn) = DbExecutor::create(cfg.db_path.as_deref().unwrap_or("uberbot.db3"))?;
-    let exec_thread = thread::spawn(move || {
-        db_exec.run();
-        tracing::info!("Database executor has been shut down");
-    });
+    let exec_thread = thread::spawn(move || db_exec.run());
 
     let uber_ver = concat!("Überbot ", env!("CARGO_PKG_VERSION"));
     let irc_config = Config {
@@ -104,11 +102,20 @@ async fn main() -> anyhow::Result<()> {
     bot.add_command("help".into(), Help);
     bot.add_command("waifu".into(), Waifu);
     bot.add_command("owo".into(), Owo);
+    bot.add_command("ev".into(), Eval::default());
     bot.add_trigger(Regex::new(r"^(?:(?<u>\S+):\s+)?s/(?<r>[^/]*)/(?<w>[^/]*)(?:/(?<f>[a-z]*))?\s*")?, Sed);
     #[cfg(feature = "debug")]
     {
         use commands::debug::*;
         bot.add_command("lastmsg".into(), LastMsg);
+    }
+
+    if let Some(spotcfg) = cfg.spotify {
+        let creds = Credentials::new(&spotcfg.client_id, &spotcfg.client_secret);
+        let spotify = Spotify::new(creds).await?;
+        bot.add_trigger(Regex::new(r"(?:https?|spotify):(?://open\.spotify\.com/)?(track|artist|album|playlist)[/:]([a-zA-Z0-9]*)")?, spotify);
+    } else {
+        tracing::warn!("Spotify module is disabled, because the config is missing")
     }
 
     let state = AppState {
@@ -145,7 +152,7 @@ async fn main() -> anyhow::Result<()> {
     exec_thread
         .join()
         .unwrap_or_else(|e| tracing::warn!("Couldn't join the database: {:?}", e));
-    tracing::info!("Executor thread finished");
+    tracing::info!("DB Executor thread finished");
     tracing::info!("Shutdown complete!");
 
     Ok(())

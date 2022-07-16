@@ -3,14 +3,14 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 pub struct UberConfig {
     pub irc: IrcConfig,
-    pub spotify: SpotifyConfig, // TODO: make optional
+    pub spotify: Option<SpotifyConfig>,
     pub db_path: Option<String>,
 }
 
 #[derive(Deserialize)]
 pub struct SpotifyConfig {
-    pub spotify_client_id: String,
-    pub spotify_client_secret: String,
+    pub client_id: String,
+    pub client_secret: String,
 }
 
 #[derive(Deserialize)]

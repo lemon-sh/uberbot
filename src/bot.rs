@@ -14,7 +14,7 @@ fn separate_to_space(str: &str, prefix_len: usize) -> (&str, Option<&str>) {
 
 #[async_trait]
 pub trait Trigger {
-    async fn execute<'a>(&mut self, msg: Message<'a>, matches: Captures<'a>) -> anyhow::Result<String>;
+    async fn execute<'a>(&mut self, msg: Message<'a>, captures: Captures<'a>) -> anyhow::Result<String>;
 }
 
 #[async_trait]
