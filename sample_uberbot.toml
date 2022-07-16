@@ -5,7 +5,7 @@ tls = true
 username = "uberbot"
 channels = ["#main", "#no-normies"]
 mode = "+B"
-prefix = "!"
+prefix = "u!"
 
 [spotify]
 spotify_client_id = ""

@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
 use std::thread;
+use fancy_regex::Regex;
 
 use crate::bot::Bot;
 use crate::commands::waifu::Waifu;
@@ -12,12 +13,13 @@ use futures_util::stream::StreamExt;
 use irc::client::prelude::Config;
 use irc::client::{Client, ClientStream};
 use irc::proto::{ChannelExt, Command, Prefix};
-use rspotify::Credentials;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::unbounded_channel;
 use tracing_subscriber::EnvFilter;
+use crate::commands::help::Help;
 use crate::commands::leek::Owo;
+use crate::commands::sed::Sed;
 
 use crate::config::UberConfig;
 use crate::database::{DbExecutor, ExecutorConnection};
@@ -34,8 +36,8 @@ async fn terminate_signal() {
     let mut sigint = signal(SignalKind::interrupt()).unwrap();
     tracing::debug!("Installed ctrl+c handler");
     select! {
-        _ = sigterm.recv() => return,
-        _ = sigint.recv() => return
+        _ = sigterm.recv() => (),
+        _ = sigint.recv() => ()
     }
 }
 
@@ -47,7 +49,7 @@ async fn terminate_signal() {
     let _ = ctrlc.recv().await;
 }
 
-pub struct AppState<SF: FnMut(String, String) -> anyhow::Result<()>> {
+pub struct AppState<SF: Fn(String, String) -> anyhow::Result<()>> {
     client: Arc<Client>,
     stream: ClientStream,
     bot: Bot<SF>,
@@ -99,6 +101,7 @@ async fn main() -> anyhow::Result<()> {
         move |target, msg| Ok(client.send_privmsg(target, msg)?)
     });
 
+    bot.add_command("help".into(), Help);
     bot.add_command("waifu".into(), Waifu);
     bot.add_command("owo".into(), Owo);
 
@@ -142,7 +145,7 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn message_loop<SF: FnMut(String, String) -> anyhow::Result<()>>(
+async fn message_loop<SF: Fn(String, String) -> anyhow::Result<()>>(
     mut state: AppState<SF>,
 ) -> anyhow::Result<()> {
     while let Some(message) = state.stream.next().await.transpose()? {
@@ -152,11 +155,7 @@ async fn message_loop<SF: FnMut(String, String) -> anyhow::Result<()>>(
                     Prefix::Nickname(name, _, _) => Some(&name[..]),
                     _ => None,
                 }) {
-                    if let Err(e) = state.bot.handle_message(origin, author, &content).await {
-                        state
-                            .client
-                            .send_privmsg(origin, &format!("Error: {}", e))?;
-                    }
+                    state.bot.handle_message(origin, author, &content).await
                 } else {
                     tracing::warn!("Couldn't get the author for a message");
                 }
