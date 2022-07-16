@@ -7,7 +7,7 @@ pub struct Sed;
 #[async_trait]
 impl Trigger for Sed {
     async fn execute<'a>(&mut self, msg: Message<'a>, matches: Captures<'a>) -> anyhow::Result<String> {
-        let mut foreign_author;
+        let foreign_author;
         let author = if let Some(author) = matches.name("u").map(|m| m.as_str()) {
             foreign_author = true;
             author
