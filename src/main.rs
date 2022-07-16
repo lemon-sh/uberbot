@@ -21,6 +21,7 @@ use crate::commands::help::Help;
 use crate::commands::leek::Owo;
 use crate::commands::sed::Sed;
 use crate::commands::spotify::Spotify;
+use crate::commands::title::Title;
 
 use crate::config::UberConfig;
 use crate::database::{DbExecutor, ExecutorConnection};
@@ -100,22 +101,22 @@ async fn main() -> anyhow::Result<()> {
     });
 
     bot.add_command("help".into(), Help);
-    bot.add_command("waifu".into(), Waifu);
+    bot.add_command("waifu".into(), Waifu::default());
     bot.add_command("owo".into(), Owo);
     bot.add_command("ev".into(), Eval::default());
     bot.add_trigger(Regex::new(r"^(?:(?<u>\S+):\s+)?s/(?<r>[^/]*)/(?<w>[^/]*)(?:/(?<f>[a-z]*))?\s*")?, Sed);
-    #[cfg(feature = "debug")]
-    {
-        use commands::debug::*;
-        bot.add_command("lastmsg".into(), LastMsg);
-    }
-
     if let Some(spotcfg) = cfg.spotify {
         let creds = Credentials::new(&spotcfg.client_id, &spotcfg.client_secret);
         let spotify = Spotify::new(creds).await?;
         bot.add_trigger(Regex::new(r"(?:https?|spotify):(?://open\.spotify\.com/)?(track|artist|album|playlist)[/:]([a-zA-Z0-9]*)")?, spotify);
     } else {
         tracing::warn!("Spotify module is disabled, because the config is missing")
+    }
+    bot.add_trigger(Regex::new(r"https?://[^\s/$.?#].\S*")?, Title::new()?);
+    #[cfg(feature = "debug")]
+    {
+        use commands::debug::*;
+        bot.add_command("lastmsg".into(), LastMsg);
     }
 
     let state = AppState {

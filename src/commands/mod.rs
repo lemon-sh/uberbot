@@ -7,3 +7,4 @@ pub mod waifu;
 pub mod sed;
 pub mod eval;
 pub mod spotify;
+pub mod title;
