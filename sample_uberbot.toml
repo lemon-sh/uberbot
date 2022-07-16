@@ -1,6 +1,7 @@
 [irc]
 host = "karx.xyz"
 port = 6697
+tls = true
 username = "uberbot"
 channels = ["#main", "#no-normies"]
 mode = "+B"
