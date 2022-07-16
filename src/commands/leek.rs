@@ -1,4 +1,6 @@
+use crate::bot::{Command, Message};
 use arrayvec::ArrayString;
+use async_trait::async_trait;
 use rand::Rng;
 use std::{
     error::Error,
@@ -85,11 +87,11 @@ fn owoify(input: &str) -> LeekResult {
             // textmoji
             '.' => {
                 builder.try_push_str(match rng.gen_range(0..6) {
-                    1 => " OwO",
+                    1 => " >~<",
                     2 => " (◕ᴗ◕✿)",
                     3 => " >w<",
                     4 => " >_<",
-                    5 => " ^•ﻌ•^",
+                    5 => " OwO",
                     _ => " ^^",
                 })?;
             }
@@ -103,33 +105,49 @@ fn owoify(input: &str) -> LeekResult {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Command {
+enum LeekCommand {
     Owo,
     Leet,
     Mock,
 }
 
-pub fn execute(
-    state: &mut crate::AppState,
-    cmd: Command,
-    target: &str,
-    nick: &str,
-) -> anyhow::Result<()> {
-    match state.last_msgs.get(nick) {
-        Some(msg) => {
-            tracing::debug!("Executing {:?} on {:?}", cmd, msg);
-            let output = match cmd {
-                Command::Owo => super::leek::owoify(msg)?,
-                Command::Leet => super::leek::leetify(msg),
-                Command::Mock => super::leek::mock(msg),
-            };
-            state.client.send_privmsg(target, &output)?;
+fn execute_leek(cmd: LeekCommand, msg: &Message) -> anyhow::Result<String> {
+    let nick = msg.content.unwrap_or(msg.author);
+    match msg.last_msg.get(nick) {
+        Some(msg) => Ok(match cmd {
+            LeekCommand::Owo => owoify(msg)?,
+            LeekCommand::Leet => leetify(msg),
+            LeekCommand::Mock => mock(msg),
         }
-        None => {
-            state
-                .client
-                .send_privmsg(target, "No last messages found.")?;
-        }
+        .to_string()),
+        None => Ok("No previous messages found.".into()),
     }
-    Ok(())
+}
+
+pub struct Owo;
+pub struct Leet;
+pub struct Mock;
+
+#[async_trait]
+impl Command for Owo {
+    //noinspection RsNeedlessLifetimes
+    async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
+        execute_leek(LeekCommand::Owo, &msg)
+    }
+}
+
+#[async_trait]
+impl Command for Leet {
+    //noinspection RsNeedlessLifetimes
+    async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
+        execute_leek(LeekCommand::Leet, &msg)
+    }
+}
+
+#[async_trait]
+impl Command for Mock {
+    //noinspection RsNeedlessLifetimes
+    async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
+        execute_leek(LeekCommand::Mock, &msg)
+    }
 }

@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use fancy_regex::Regex;
 use crate::ExecutorConnection;
 use async_trait::async_trait;
+use fancy_regex::{Captures, Regex};
+use std::collections::HashMap;
 
 fn separate_to_space(str: &str, prefix_len: usize) -> (&str, Option<&str>) {
     if let Some(o) = str.find(' ') {
@@ -11,50 +11,58 @@ fn separate_to_space(str: &str, prefix_len: usize) -> (&str, Option<&str>) {
     }
 }
 
-pub trait RegexCommand {
-    fn execute(&mut self, message: String) -> anyhow::Result<String>;
+#[async_trait]
+pub trait Trigger {
+    async fn execute(&mut self, msg: Message, matches: Captures) -> anyhow::Result<String>;
 }
 
 #[async_trait]
-pub trait NormalCommand {
-    async fn execute(&mut self, last_msg: &HashMap<String, String>, message: String) -> anyhow::Result<String>;
+pub trait Command {
+    //noinspection RsNeedlessLifetimes
+    async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String>;
 }
 
-#[derive(Default)]
-struct Commands {
-    regex: Vec<(Regex, Box<dyn RegexCommand + Send>)>,
-    normal: HashMap<String, Box<dyn NormalCommand + Send>>,
+pub struct Message<'a> {
+    pub last_msg: &'a HashMap<String, String>,
+    pub author: &'a str,
+    pub content: Option<&'a str>,
 }
 
 pub struct Bot<SF: FnMut(String, String) -> anyhow::Result<()>> {
     last_msg: HashMap<String, String>,
     prefix: String,
     db: ExecutorConnection,
-    commands: Commands,
-    sendmsg: SF
+    commands: HashMap<String, Box<dyn Command + Send>>,
+    triggers: Vec<(Regex, Box<dyn Trigger + Send>)>,
+    sendmsg: SF,
 }
 
 impl<SF: FnMut(String, String) -> anyhow::Result<()>> Bot<SF> {
     pub fn new(prefix: String, db: ExecutorConnection, sendmsg: SF) -> Self {
         Bot {
             last_msg: HashMap::new(),
+            commands: HashMap::new(),
+            triggers: Vec::new(),
             prefix,
             db,
-            commands: Commands::default(),
-            sendmsg
+            sendmsg,
         }
     }
 
-    pub fn add_command<C: NormalCommand + Send + 'static>(&mut self, name: String, cmd: C) {
-        self.commands.normal.insert(name, Box::new(cmd));
+    pub fn add_command<C: Command + Send + 'static>(&mut self, name: String, cmd: C) {
+        self.commands.insert(name, Box::new(cmd));
     }
 
-    pub fn add_regex_command<C: RegexCommand + Send + 'static>(&mut self, regex: Regex, cmd: C) {
-        self.commands.regex.push((regex, Box::new(cmd)));
+    pub fn add_regex_command<C: Trigger + Send + 'static>(&mut self, regex: Regex, cmd: C) {
+        self.triggers.push((regex, Box::new(cmd)));
     }
 
-    pub async fn handle_message(&mut self, origin: &str, author: &str, content: &str) -> anyhow::Result<()> {
-        (self.sendmsg)(origin.into(), content.into()).unwrap();
+    pub async fn handle_message(
+        &mut self,
+        origin: &str,
+        author: &str,
+        content: &str,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
 }

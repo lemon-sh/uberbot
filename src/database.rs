@@ -135,6 +135,16 @@ impl ExecutorConnection {
         Option<Quote>,
         author: Option<String>
     );
-    executor_wrapper!(search_quotes, Task::SearchQuotes, Option<Vec<Quote>>, query: String);
-    executor_wrapper!(random_n_quotes, Task::RandomNQuotes, Option<Vec<Quote>>, count: u8);
+    executor_wrapper!(
+        search_quotes,
+        Task::SearchQuotes,
+        Option<Vec<Quote>>,
+        query: String
+    );
+    executor_wrapper!(
+        random_n_quotes,
+        Task::RandomNQuotes,
+        Option<Vec<Quote>>,
+        count: u8
+    );
 }

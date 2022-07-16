@@ -1,41 +1,31 @@
 #![allow(clippy::match_wildcard_for_single_variants)]
 
+use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
 use std::thread;
-use std::env;
-use std::fmt::Display;
 
+use crate::bot::Bot;
+use crate::commands::waifu::Waifu;
 use futures_util::stream::StreamExt;
 use irc::client::prelude::Config;
 use irc::client::{Client, ClientStream};
 use irc::proto::{ChannelExt, Command, Prefix};
 use rspotify::Credentials;
-use serde::Deserialize;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::unbounded_channel;
 use tracing_subscriber::EnvFilter;
-use crate::bot::Bot;
-use crate::bots::misc::Waifu;
+use crate::commands::leek::Owo;
 
 use crate::config::UberConfig;
 use crate::database::{DbExecutor, ExecutorConnection};
 
-mod bots;
-mod database;
 mod bot;
+mod commands;
 mod config;
-
-// this will be displayed when the help command is used
-const HELP: &[&str] = &[
-    concat!("=- \x1d\x02Ü\x02berbot\x0f ", env!("CARGO_PKG_VERSION"), " -="),
-    " * waifu <category>",
-    " * owo/mock/leet [user]",
-    " * ev <math expression>",
-    " - This bot also provides titles of URLs and details for Spotify URIs/links. It can also resolve sed expressions."
-];
+mod database;
 
 #[cfg(unix)]
 async fn terminate_signal() {
@@ -60,7 +50,7 @@ async fn terminate_signal() {
 pub struct AppState<SF: FnMut(String, String) -> anyhow::Result<()>> {
     client: Arc<Client>,
     stream: ClientStream,
-    bot: Bot<SF>
+    bot: Bot<SF>,
 }
 
 #[tokio::main]
@@ -76,8 +66,7 @@ async fn main() -> anyhow::Result<()> {
 
     let cfg: UberConfig = toml::from_str(&client_conf)?;
 
-    let (db_exec, db_conn) =
-        DbExecutor::create(cfg.db_path.as_deref().unwrap_or("uberbot.db3"))?;
+    let (db_exec, db_conn) = DbExecutor::create(cfg.db_path.as_deref().unwrap_or("uberbot.db3"))?;
     let exec_thread = thread::spawn(move || {
         db_exec.run();
         tracing::info!("Database executor has been shut down");
@@ -85,12 +74,7 @@ async fn main() -> anyhow::Result<()> {
 
     let uber_ver = concat!("Überbot ", env!("CARGO_PKG_VERSION"));
     let irc_config = Config {
-        nickname: Some(
-            cfg
-                .irc
-                .nickname
-                .unwrap_or_else(|| cfg.irc.username.clone()),
-        ),
+        nickname: Some(cfg.irc.nickname.unwrap_or_else(|| cfg.irc.username.clone())),
         username: Some(cfg.irc.username.clone()),
         realname: Some(cfg.irc.username),
         server: Some(cfg.irc.host),
@@ -116,11 +100,12 @@ async fn main() -> anyhow::Result<()> {
     });
 
     bot.add_command("waifu".into(), Waifu);
+    bot.add_command("owo".into(), Owo);
 
     let state = AppState {
         client: client.clone(),
         stream,
-        bot
+        bot,
     };
     let message_loop_task = tokio::spawn(async move {
         if let Err(e) = message_loop(state).await {
@@ -157,7 +142,9 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn message_loop<SF: FnMut(String, String) -> anyhow::Result<()>>(mut state: AppState<SF>) -> anyhow::Result<()> {
+async fn message_loop<SF: FnMut(String, String) -> anyhow::Result<()>>(
+    mut state: AppState<SF>,
+) -> anyhow::Result<()> {
     while let Some(message) = state.stream.next().await.transpose()? {
         if let Command::PRIVMSG(ref origin, content) = message.command {
             if origin.is_channel_name() {
@@ -178,5 +165,3 @@ async fn message_loop<SF: FnMut(String, String) -> anyhow::Result<()>>(mut state
     }
     Ok(())
 }
-
-
