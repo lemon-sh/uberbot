@@ -2,6 +2,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize)]
 pub struct UberConfig {
+    pub log_level: Option<String>,
     pub irc: IrcConfig,
     pub spotify: Option<SpotifyConfig>,
     pub bot: BotConfig

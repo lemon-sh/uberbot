@@ -1,9 +1,8 @@
 #![allow(clippy::module_name_repetitions)]
 
 use fancy_regex::Regex;
-use std::env;
-use std::fs::File;
-use std::io::Read;
+use std::{env, fs};
+use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 
@@ -24,7 +23,7 @@ use rspotify::Credentials;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::unbounded_channel;
-use tracing_subscriber::EnvFilter;
+use tracing::Level;
 
 use crate::config::UberConfig;
 use crate::database::{DbExecutor, ExecutorConnection};
@@ -57,16 +56,21 @@ async fn terminate_signal() {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_env("UBERBOT_LOG"))
+    let config_var = env::var("UBERBOT_CONFIG");
+    let config_path = config_var.as_deref().unwrap_or("uberbot.toml");
+    println!("Loading config from '{}'...", config_path);
+    let config_str = fs::read_to_string(config_path)?;
+    let cfg: UberConfig = toml::from_str(&config_str)?;
+
+    tracing_subscriber::fmt::fmt()
+        .with_max_level({
+            if let Some(o) = cfg.log_level.as_deref() {
+                Level::from_str(o)?
+            } else {
+                Level::INFO
+            }
+        })
         .init();
-
-    let mut file =
-        File::open(env::var("UBERBOT_CONFIG").unwrap_or_else(|_| "uberbot.toml".to_string()))?;
-    let mut client_conf = String::new();
-    file.read_to_string(&mut client_conf)?;
-
-    let cfg: UberConfig = toml::from_str(&client_conf)?;
 
     let (db_exec, db_conn) = DbExecutor::create(cfg.bot.db_path.as_deref().unwrap_or("uberbot.db3"))?;
     let exec_thread = thread::spawn(move || db_exec.run());
