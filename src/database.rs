@@ -7,10 +7,12 @@ use tokio::sync::{
 
 #[derive(Debug)]
 enum Task {
-    AddQuote(oneshot::Sender<bool>, Quote),
-    GetQuote(oneshot::Sender<Option<Quote>>, Option<String>),
-    SearchQuotes(oneshot::Sender<Option<Vec<Quote>>>, String),
-    RandomNQuotes(oneshot::Sender<Option<Vec<Quote>>>, u8),
+    AddQuote(oneshot::Sender<rusqlite::Result<()>>, Quote),
+    GetQuote(
+        oneshot::Sender<rusqlite::Result<Option<Quote>>>,
+        Option<String>,
+    ),
+    SearchQuotes(oneshot::Sender<rusqlite::Result<Vec<Quote>>>, String),
 }
 
 pub struct DbExecutor {
@@ -40,45 +42,34 @@ impl DbExecutor {
         while let Some(task) = self.rx.blocking_recv() {
             match task {
                 Task::AddQuote(tx, quote) => {
-                    if let Err(e) = self.db.execute(
-                        "insert into quotes(quote,username) values(?,?)",
-                        params![quote.quote, quote.author],
-                    ) {
-                        tracing::error!("A database error has occurred: {}", e);
-                        tx.send(false).unwrap();
-                    } else {
-                        tx.send(true).unwrap();
-                    }
+                    let result = self
+                        .db
+                        .execute(
+                            "insert into quotes(quote,username) values(?,?)",
+                            params![quote.quote, quote.author],
+                        )
+                        .map(|_| ());
+                    tx.send(result).unwrap();
                 }
                 Task::GetQuote(tx, author) => {
-                    let quote = if let Some(ref author) = author {
+                    let result = if let Some(ref author) = author {
                         self.db.query_row("select quote,username from quotes where username=? order by random() limit 1", params![author], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
                     } else {
                         self.db.query_row("select quote,username from quotes order by random() limit 1", params![], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
-                    }.optional().unwrap_or_else(|e| {
-                        tracing::error!("A database error has occurred: {}", e);
-                        None
-                    });
-                    tx.send(quote).unwrap();
+                    }.optional();
+                    tx.send(result).unwrap();
                 }
                 Task::SearchQuotes(tx, query) => {
                     tx.send(self.yield_quotes("select quote,username from quotes where quote like '%'||?1||'%' order by quote asc limit 5", params![query])).unwrap();
-                }
-                Task::RandomNQuotes(tx, count) => {
-                    tx.send(self.yield_quotes(
-                        "select quote,username from quotes order by random() limit ?",
-                        params![count],
-                    ))
-                    .unwrap();
                 }
             }
         }
     }
 
-    fn yield_quotes<P: Params>(&self, sql: &str, params: P) -> Option<Vec<Quote>> {
-        match self.db.prepare(sql).and_then(|mut v| {
+    fn yield_quotes<P: Params>(&self, sql: &str, params: P) -> rusqlite::Result<Vec<Quote>> {
+        self.db.prepare(sql).and_then(|mut v| {
             v.query(params).and_then(|mut v| {
-                let mut quotes: Vec<Quote> = Vec::with_capacity(50);
+                let mut quotes: Vec<Quote> = Vec::new();
                 while let Some(row) = v.next()? {
                     quotes.push(Quote {
                         quote: row.get(0)?,
@@ -87,13 +78,7 @@ impl DbExecutor {
                 }
                 Ok(quotes)
             })
-        }) {
-            Ok(o) => Some(o),
-            Err(e) => {
-                tracing::error!("A database error has occurred: {}", e);
-                None
-            }
-        }
+        })
     }
 }
 
@@ -128,23 +113,22 @@ macro_rules! executor_wrapper {
 
 impl ExecutorConnection {
     // WARNING: these methods are NOT cancel-safe
-    executor_wrapper!(add_quote, Task::AddQuote, bool, quote: Quote);
+    executor_wrapper!(
+        add_quote,
+        Task::AddQuote,
+        rusqlite::Result<()>,
+        quote: Quote
+    );
     executor_wrapper!(
         get_quote,
         Task::GetQuote,
-        Option<Quote>,
+        rusqlite::Result<Option<Quote>>,
         author: Option<String>
     );
     executor_wrapper!(
         search_quotes,
         Task::SearchQuotes,
-        Option<Vec<Quote>>,
+        rusqlite::Result<Vec<Quote>>,
         query: String
-    );
-    executor_wrapper!(
-        random_n_quotes,
-        Task::RandomNQuotes,
-        Option<Vec<Quote>>,
-        count: u8
     );
 }
