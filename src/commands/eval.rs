@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use async_trait::async_trait;
 use crate::bot::{Command, Context};
+use async_trait::async_trait;
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct Eval {
-    last_eval: HashMap<String, f64>
+    last_eval: HashMap<String, f64>,
 }
 
 #[async_trait]

@@ -113,11 +113,11 @@ enum LeekCommand {
 
 async fn execute_leek(cmd: LeekCommand, msg: &Context<'_>) -> anyhow::Result<String> {
     let nick = msg.content.unwrap_or(msg.author);
-    match msg.last_msg.read().await.get(nick) {
+    match msg.history.last_msg(nick).await {
         Some(msg) => Ok(match cmd {
-            LeekCommand::Owo => owoify(msg)?,
-            LeekCommand::Leet => leetify(msg),
-            LeekCommand::Mock => mock(msg),
+            LeekCommand::Owo => owoify(&msg)?,
+            LeekCommand::Leet => leetify(&msg),
+            LeekCommand::Mock => mock(&msg),
         }
         .to_string()),
         None => Ok("No previous messages found.".into()),

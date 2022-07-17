@@ -1,4 +1,4 @@
-use crate::bot::{Context, Command};
+use crate::bot::{Command, Context};
 use async_trait::async_trait;
 
 const HELP: &str = concat!(

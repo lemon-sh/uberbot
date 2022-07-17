@@ -1,11 +1,18 @@
+use fancy_regex::Regex;
 use std::env;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
 use std::thread;
-use fancy_regex::Regex;
 
 use crate::bot::Bot;
+use crate::commands::eval::Eval;
+use crate::commands::help::Help;
+use crate::commands::leek::Owo;
+use crate::commands::quotes::{Grab, Quot};
+use crate::commands::sed::Sed;
+use crate::commands::spotify::Spotify;
+use crate::commands::title::Title;
 use crate::commands::waifu::Waifu;
 use futures_util::stream::StreamExt;
 use irc::client::prelude::Config;
@@ -16,12 +23,6 @@ use tokio::select;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc::unbounded_channel;
 use tracing_subscriber::EnvFilter;
-use crate::commands::eval::Eval;
-use crate::commands::help::Help;
-use crate::commands::leek::Owo;
-use crate::commands::sed::Sed;
-use crate::commands::spotify::Spotify;
-use crate::commands::title::Title;
 
 use crate::config::UberConfig;
 use crate::database::{DbExecutor, ExecutorConnection};
@@ -30,6 +31,7 @@ mod bot;
 mod commands;
 mod config;
 mod database;
+mod history;
 
 #[cfg(unix)]
 async fn terminate_signal() {
@@ -89,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
     let (ctx, _) = broadcast::channel(1);
     let (etx, mut erx) = unbounded_channel();
 
-    let mut bot = Bot::new(cfg.irc.prefix, db_conn, {
+    let mut bot = Bot::new(cfg.irc.prefix, db_conn, 3, {
         let client = client.clone();
         move |target, msg| Ok(client.send_privmsg(target, msg)?)
     });
@@ -98,7 +100,12 @@ async fn main() -> anyhow::Result<()> {
     bot.add_command("waifu".into(), Waifu::default());
     bot.add_command("owo".into(), Owo);
     bot.add_command("ev".into(), Eval::default());
-    bot.add_trigger(Regex::new(r"^(?:(?<u>\S+):\s+)?s/(?<r>[^/]*)/(?<w>[^/]*)(?:/(?<f>[a-z]*))?\s*")?, Sed);
+    bot.add_command("grab".into(), Grab);
+    bot.add_command("quot".into(), Quot);
+    bot.add_trigger(
+        Regex::new(r"^(?:(?<u>\S+):\s+)?s/(?<r>[^/]*)/(?<w>[^/]*)(?:/(?<f>[a-z]*))?\s*")?,
+        Sed,
+    );
     if let Some(spotcfg) = cfg.spotify {
         let creds = Credentials::new(&spotcfg.client_id, &spotcfg.client_secret);
         let spotify = Spotify::new(creds).await?;
@@ -150,7 +157,7 @@ async fn main() -> anyhow::Result<()> {
 
 async fn message_loop<SF: Fn(String, String) -> anyhow::Result<()>>(
     mut stream: ClientStream,
-    bot: Bot<SF>
+    bot: Bot<SF>,
 ) -> anyhow::Result<()> {
     while let Some(message) = stream.next().await.transpose()? {
         if let Command::PRIVMSG(ref origin, content) = message.command {

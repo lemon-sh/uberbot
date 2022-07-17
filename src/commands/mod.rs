@@ -1,10 +1,11 @@
 #[cfg(feature = "debug")]
 pub mod debug;
 
+pub mod eval;
 pub mod help;
 pub mod leek;
-pub mod waifu;
+pub mod quotes;
 pub mod sed;
-pub mod eval;
 pub mod spotify;
 pub mod title;
+pub mod waifu;
