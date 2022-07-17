@@ -1,3 +1,5 @@
+#![allow(clippy::module_name_repetitions)]
+
 use fancy_regex::Regex;
 use std::env;
 use std::fs::File;
@@ -8,7 +10,7 @@ use std::thread;
 use crate::bot::Bot;
 use crate::commands::eval::Eval;
 use crate::commands::help::Help;
-use crate::commands::leek::Owo;
+use crate::commands::leek::{Leet, Mock, Owo};
 use crate::commands::quotes::{Grab, Quot};
 use crate::commands::sed::Sed;
 use crate::commands::spotify::Spotify;
@@ -99,6 +101,8 @@ async fn main() -> anyhow::Result<()> {
     bot.add_command("help".into(), Help);
     bot.add_command("waifu".into(), Waifu::default());
     bot.add_command("owo".into(), Owo);
+    bot.add_command("leet".into(), Leet);
+    bot.add_command("mock".into(), Mock);
     bot.add_command("ev".into(), Eval::default());
     bot.add_command("grab".into(), Grab);
     bot.add_command("quot".into(), Quot);
@@ -109,9 +113,9 @@ async fn main() -> anyhow::Result<()> {
     if let Some(spotcfg) = cfg.spotify {
         let creds = Credentials::new(&spotcfg.client_id, &spotcfg.client_secret);
         let spotify = Spotify::new(creds).await?;
-        bot.add_trigger(Regex::new(r"(?:https?|spotify):(?://open\.spotify\.com/)?(track|artist|album|playlist)[/:]([a-zA-Z0-9]*)")?, spotify);
+        bot.add_trigger(Regex::new(r"(?:https?|spotify):(?://open\.spotify\.com/)?(track|artist|album|playlist)[/:]([a-zA-Z\d]*)")?, spotify);
     } else {
-        tracing::warn!("Spotify module is disabled, because the config is missing")
+        tracing::warn!("Spotify module is disabled, because the config is missing");
     }
     bot.add_trigger(Regex::new(r"https?://[^\s/$.?#].\S*")?, Title::new()?);
     #[cfg(feature = "debug")]
@@ -164,9 +168,9 @@ async fn message_loop<SF: Fn(String, String) -> anyhow::Result<()>>(
             if origin.is_channel_name() {
                 if let Some(author) = message.prefix.as_ref().and_then(|p| match p {
                     Prefix::Nickname(name, _, _) => Some(&name[..]),
-                    _ => None,
+                    Prefix::ServerName(_) => None,
                 }) {
-                    bot.handle_message(origin, author, &content).await
+                    bot.handle_message(origin, author, &content).await;
                 } else {
                     tracing::warn!("Couldn't get the author for a message");
                 }

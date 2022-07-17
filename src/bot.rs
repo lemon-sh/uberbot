@@ -83,30 +83,29 @@ impl<SF: Fn(String, String) -> anyhow::Result<()>> Bot<SF> {
                 return (self.sendmsg)(origin.into(), handler.lock().await.execute(msg).await?);
             }
             return (self.sendmsg)(origin.into(), "Unknown command.".into());
-        } else {
-            for trigger in &self.triggers {
-                let captures = trigger.0.captures(content)?;
-                if let Some(captures) = captures {
-                    let msg = Context {
-                        author,
-                        content: Some(content),
-                        db: &self.db,
-                        history: &self.history,
-                    };
-                    return (self.sendmsg)(
-                        origin.into(),
-                        trigger.1.lock().await.execute(msg, captures).await?,
-                    );
-                }
-            }
-            self.history.add_message(author, content).await;
         }
+        for trigger in &self.triggers {
+            let captures = trigger.0.captures(content)?;
+            if let Some(captures) = captures {
+                let msg = Context {
+                    author,
+                    content: Some(content),
+                    db: &self.db,
+                    history: &self.history,
+                };
+                return (self.sendmsg)(
+                    origin.into(),
+                    trigger.1.lock().await.execute(msg, captures).await?,
+                );
+            }
+        }
+        self.history.add_message(author, content).await;
         Ok(())
     }
 
     pub async fn handle_message(&self, origin: &str, author: &str, content: &str) {
         if let Err(e) = self.handle_message_inner(origin, author, content).await {
-            let _ = (self.sendmsg)(origin.into(), format!("Error: {}", e));
+            let _err = (self.sendmsg)(origin.into(), format!("Error: {}", e));
         }
     }
 }

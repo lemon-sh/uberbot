@@ -16,7 +16,7 @@ impl MessageHistory {
 
     pub async fn last_msg(&self, user: &str) -> Option<String> {
         let map = self.map.read().await;
-        map.get(user).and_then(|d| d.get(0)).map(|s| s.to_string())
+        map.get(user).and_then(|d| d.get(0)).map(ToString::to_string)
     }
 
     pub async fn last_msgs(&self, user: &str, count: usize) -> Option<Vec<String>> {
