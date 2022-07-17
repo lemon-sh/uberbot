@@ -130,24 +130,21 @@ pub struct Mock;
 
 #[async_trait]
 impl Command for Owo {
-    //noinspection RsNeedlessLifetimes
-    async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
+    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String> {
         execute_leek(LeekCommand::Owo, &msg).await
     }
 }
 
 #[async_trait]
 impl Command for Leet {
-    //noinspection RsNeedlessLifetimes
-    async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
+    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String> {
         execute_leek(LeekCommand::Leet, &msg).await
     }
 }
 
 #[async_trait]
 impl Command for Mock {
-    //noinspection RsNeedlessLifetimes
-    async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
+    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String> {
         execute_leek(LeekCommand::Mock, &msg).await
     }
 }

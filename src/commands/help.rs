@@ -13,8 +13,7 @@ pub struct Help;
 
 #[async_trait]
 impl Command for Help {
-    //noinspection RsNeedlessLifetimes
-    async fn execute<'a>(&mut self, _msg: Message<'a>) -> anyhow::Result<String> {
+    async fn execute(&mut self, _msg: Message<'_>) -> anyhow::Result<String> {
         Ok(HELP.into())
     }
 }

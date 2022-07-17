@@ -19,8 +19,7 @@ pub trait Trigger {
 
 #[async_trait]
 pub trait Command {
-    //noinspection RsNeedlessLifetimes
-    async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String>;
+    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String>;
 }
 
 pub struct Message<'a> {

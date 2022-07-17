@@ -10,8 +10,7 @@ pub struct Eval {
 
 #[async_trait]
 impl Command for Eval {
-    //noinspection RsNeedlessLifetimes
-    async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
+    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String> {
         if let Some(expr) = msg.content {
             let last_eval = self.last_eval.entry(msg.author.into()).or_insert(0.0);
             let mut meval_ctx = Context::new();

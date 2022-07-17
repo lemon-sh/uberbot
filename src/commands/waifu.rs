@@ -10,8 +10,7 @@ pub struct Waifu {
 
 #[async_trait]
 impl Command for Waifu {
-    //noinspection RsNeedlessLifetimes
-    async fn execute<'a>(&mut self, msg: Message<'a>) -> anyhow::Result<String> {
+    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String> {
         let category = msg.content.unwrap_or("waifu");
         let request = self.http.get(format!("https://api.waifu.pics/sfw/{}", category)).build()?;
         let response = self.http.execute(request)
