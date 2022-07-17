@@ -51,12 +51,6 @@ async fn terminate_signal() {
     let _ = ctrlc.recv().await;
 }
 
-pub struct AppState<SF: Fn(String, String) -> anyhow::Result<()>> {
-    client: Arc<Client>,
-    stream: ClientStream,
-    bot: Bot<SF>,
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
@@ -119,13 +113,8 @@ async fn main() -> anyhow::Result<()> {
         bot.add_command("lastmsg".into(), LastMsg);
     }
 
-    let state = AppState {
-        client: client.clone(),
-        stream,
-        bot,
-    };
     let message_loop_task = tokio::spawn(async move {
-        if let Err(e) = message_loop(state).await {
+        if let Err(e) = message_loop(stream, bot).await {
             let _err = etx.send(e);
         }
     });
@@ -160,16 +149,17 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn message_loop<SF: Fn(String, String) -> anyhow::Result<()>>(
-    mut state: AppState<SF>,
+    mut stream: ClientStream,
+    bot: Bot<SF>
 ) -> anyhow::Result<()> {
-    while let Some(message) = state.stream.next().await.transpose()? {
+    while let Some(message) = stream.next().await.transpose()? {
         if let Command::PRIVMSG(ref origin, content) = message.command {
             if origin.is_channel_name() {
                 if let Some(author) = message.prefix.as_ref().and_then(|p| match p {
                     Prefix::Nickname(name, _, _) => Some(&name[..]),
                     _ => None,
                 }) {
-                    state.bot.handle_message(origin, author, &content).await
+                    bot.handle_message(origin, author, &content).await
                 } else {
                     tracing::warn!("Couldn't get the author for a message");
                 }

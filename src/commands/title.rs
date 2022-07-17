@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use fancy_regex::{Captures, Regex};
 use reqwest::Client;
 use htmlescape::decode_html;
-use crate::bot::{Message, Trigger};
+use crate::bot::{Context, Trigger};
 
 pub struct Title {
     http: Client,
@@ -20,7 +20,7 @@ impl Title {
 
 #[async_trait]
 impl Trigger for Title {
-    async fn execute<'a>(&mut self, _msg: Message<'a>, captures: Captures<'a>) -> anyhow::Result<String> {
+    async fn execute<'a>(&mut self, _msg: Context<'a>, captures: Captures<'a>) -> anyhow::Result<String> {
         let url = captures.get(0).unwrap().as_str();
         tracing::debug!("url: {}", url);
 

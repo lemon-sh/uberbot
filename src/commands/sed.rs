@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use fancy_regex::Captures;
-use crate::bot::{Message, Trigger};
+use crate::bot::{Context, Trigger};
 
 pub struct Sed;
 
 #[async_trait]
 impl Trigger for Sed {
-    async fn execute<'a>(&mut self, msg: Message<'a>, captures: Captures<'a>) -> anyhow::Result<String> {
+    async fn execute<'a>(&mut self, msg: Context<'a>, captures: Captures<'a>) -> anyhow::Result<String> {
         let foreign_author;
         let author = if let Some(author) = captures.name("u").map(|m| m.as_str()) {
             foreign_author = true;

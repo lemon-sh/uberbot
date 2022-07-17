@@ -1,4 +1,4 @@
-use crate::bot::{Message, Command};
+use crate::bot::{Context, Command};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::Value;
@@ -10,7 +10,7 @@ pub struct Waifu {
 
 #[async_trait]
 impl Command for Waifu {
-    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String> {
+    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
         let category = msg.content.unwrap_or("waifu");
         let request = self.http.get(format!("https://api.waifu.pics/sfw/{}", category)).build()?;
         let response = self.http.execute(request)

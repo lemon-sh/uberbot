@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use fancy_regex::Captures;
 use rspotify::clients::BaseClient;
 use rspotify::model::{Id, PlayableItem};
-use crate::bot::{Message, Trigger};
+use crate::bot::{Context, Trigger};
 
 pub struct Spotify {
     spotify: ClientCredsSpotify,
@@ -21,7 +21,7 @@ impl Spotify {
 
 #[async_trait]
 impl Trigger for Spotify {
-    async fn execute<'a>(&mut self, msg: Message<'a>, captures: Captures<'a>) -> anyhow::Result<String> {
+    async fn execute<'a>(&mut self, msg: Context<'a>, captures: Captures<'a>) -> anyhow::Result<String> {
         let tp_group = captures.get(1).unwrap();
         let id_group = captures.get(2).unwrap();
         resolve_spotify(

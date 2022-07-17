@@ -1,4 +1,4 @@
-use crate::bot::{Command, Message};
+use crate::bot::{Command, Context};
 use arrayvec::ArrayString;
 use async_trait::async_trait;
 use rand::Rng;
@@ -111,7 +111,7 @@ enum LeekCommand {
     Mock,
 }
 
-async fn execute_leek(cmd: LeekCommand, msg: &Message<'_>) -> anyhow::Result<String> {
+async fn execute_leek(cmd: LeekCommand, msg: &Context<'_>) -> anyhow::Result<String> {
     let nick = msg.content.unwrap_or(msg.author);
     match msg.last_msg.read().await.get(nick) {
         Some(msg) => Ok(match cmd {
@@ -130,21 +130,21 @@ pub struct Mock;
 
 #[async_trait]
 impl Command for Owo {
-    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String> {
+    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
         execute_leek(LeekCommand::Owo, &msg).await
     }
 }
 
 #[async_trait]
 impl Command for Leet {
-    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String> {
+    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
         execute_leek(LeekCommand::Leet, &msg).await
     }
 }
 
 #[async_trait]
 impl Command for Mock {
-    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String> {
+    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
         execute_leek(LeekCommand::Mock, &msg).await
     }
 }

@@ -1,4 +1,4 @@
-use crate::bot::{Message, Command};
+use crate::bot::{Context, Command};
 use async_trait::async_trait;
 
 const HELP: &str = concat!(
@@ -13,7 +13,7 @@ pub struct Help;
 
 #[async_trait]
 impl Command for Help {
-    async fn execute(&mut self, _msg: Message<'_>) -> anyhow::Result<String> {
+    async fn execute(&mut self, _msg: Context<'_>) -> anyhow::Result<String> {
         Ok(HELP.into())
     }
 }

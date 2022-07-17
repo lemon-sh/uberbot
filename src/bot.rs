@@ -4,29 +4,31 @@ use fancy_regex::{Captures, Regex};
 use std::collections::HashMap;
 use tokio::sync::{Mutex, RwLock};
 
-fn separate_to_space(str: &str, prefix_len: usize) -> (&str, Option<&str>) {
+fn dissect<'a>(prefix: &str, str: &'a str) -> Option<(&'a str, Option<&'a str>)> {
+    let str = str.strip_prefix(prefix)?;
     if let Some(o) = str.find(' ') {
-        (&str[prefix_len..o], Some(&str[o + 1..]))
+        Some((&str[..o], Some(&str[o + 1..])))
     } else {
-        (&str[prefix_len..], None)
+        Some((str, None))
     }
 }
 
 #[async_trait]
 pub trait Trigger {
-    async fn execute<'a>(&mut self, msg: Message<'a>, captures: Captures<'a>) -> anyhow::Result<String>;
+    async fn execute<'a>(&mut self, msg: Context<'a>, captures: Captures<'a>) -> anyhow::Result<String>;
 }
 
 #[async_trait]
 pub trait Command {
-    async fn execute(&mut self, msg: Message<'_>) -> anyhow::Result<String>;
+    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String>;
 }
 
-pub struct Message<'a> {
+pub struct Context<'a> {
     pub last_msg: &'a RwLock<HashMap<String, String>>,
     pub author: &'a str,
     // in case of triggers, this is always Some(...)
     pub content: Option<&'a str>,
+    pub db: &'a ExecutorConnection
 }
 
 pub struct Bot<SF: Fn(String, String) -> anyhow::Result<()>> {
@@ -64,13 +66,13 @@ impl<SF: Fn(String, String) -> anyhow::Result<()>> Bot<SF> {
         author: &str,
         content: &str,
     ) -> anyhow::Result<()> {
-        if content.starts_with(&self.prefix) {
-            let (command, remainder) = separate_to_space(content, self.prefix.len());
+        if let Some((command, remainder)) = dissect(&self.prefix, content) {
             if let Some(handler) = self.commands.get(command) {
-                let msg = Message {
+                let msg = Context {
                     last_msg: &self.last_msg,
                     author,
-                    content: remainder
+                    content: remainder,
+                    db: &self.db
                 };
                 return (self.sendmsg)(origin.into(), handler.lock().await.execute(msg).await?)
             }
@@ -79,10 +81,11 @@ impl<SF: Fn(String, String) -> anyhow::Result<()>> Bot<SF> {
             for trigger in &self.triggers {
                 let captures = trigger.0.captures(content)?;
                 if let Some(captures) = captures {
-                    let msg = Message {
+                    let msg = Context {
                         last_msg: &self.last_msg,
                         author,
-                        content: Some(content)
+                        content: Some(content),
+                        db: &self.db
                     };
                     return (self.sendmsg)(origin.into(), trigger.1.lock().await.execute(msg, captures).await?)
                 }
