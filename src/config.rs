@@ -4,7 +4,7 @@ use serde::Deserialize;
 pub struct UberConfig {
     pub irc: IrcConfig,
     pub spotify: Option<SpotifyConfig>,
-    pub db_path: Option<String>,
+    pub bot: BotConfig
 }
 
 #[derive(Deserialize)]
@@ -23,4 +23,11 @@ pub struct IrcConfig {
     pub port: u16,
     pub username: String,
     pub prefix: String,
+}
+
+#[derive(Deserialize)]
+pub struct BotConfig {
+    pub db_path: Option<String>,
+    pub history_depth: usize,
+    pub search_limit: Option<usize>
 }

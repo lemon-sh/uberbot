@@ -1,9 +1,20 @@
 use crate::bot::{Command, Context};
 use crate::database::Quote;
 use async_trait::async_trait;
+use std::fmt::Write;
 
 pub struct Grab;
 pub struct Quot;
+
+pub struct Search {
+    limit: usize
+}
+
+impl Search {
+    pub fn new(limit: usize) -> Self {
+        Self { limit }
+    }
+}
 
 #[async_trait]
 impl Command for Grab {
@@ -51,5 +62,25 @@ impl Command for Quot {
         } else {
             Ok("No quotes found from this user.".into())
         }
+    }
+}
+
+#[async_trait]
+impl Command for Search {
+    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
+        let query = if let Some(c) = msg.content {
+            c
+        } else {
+            return Ok("Invalid usage.".into());
+        };
+        let results = msg.db.search_quotes(query.into(), self.limit).await?;
+        if results.is_empty() {
+            return Ok("No results.".into());
+        }
+        let mut buf = format!("{}/{} results:\r\n", results.len(), self.limit);
+        for q in results {
+            write!(buf, "\"{}\" ~{}\r\n", q.quote, q.author)?;
+        }
+        Ok(buf)
     }
 }

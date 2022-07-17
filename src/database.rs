@@ -12,7 +12,7 @@ enum Task {
         oneshot::Sender<rusqlite::Result<Option<Quote>>>,
         Option<String>,
     ),
-    SearchQuotes(oneshot::Sender<rusqlite::Result<Vec<Quote>>>, String),
+    SearchQuotes(oneshot::Sender<rusqlite::Result<Vec<Quote>>>, String, usize),
 }
 
 pub struct DbExecutor {
@@ -59,8 +59,8 @@ impl DbExecutor {
                     }.optional();
                     tx.send(result).unwrap();
                 }
-                Task::SearchQuotes(tx, query) => {
-                    tx.send(self.yield_quotes("select quote,username from quotes where quote like '%'||?1||'%' order by quote asc limit 5", params![query])).unwrap();
+                Task::SearchQuotes(tx, query, limit) => {
+                    tx.send(self.yield_quotes("select quote,username from quotes where quote like '%'||?1||'%' order by quote asc limit ?", params![query, limit])).unwrap();
                 }
             }
         }
@@ -129,6 +129,7 @@ impl ExecutorConnection {
         search_quotes,
         Task::SearchQuotes,
         rusqlite::Result<Vec<Quote>>,
-        query: String
+        query: String,
+        limit: usize
     );
 }

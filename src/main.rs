@@ -11,7 +11,7 @@ use crate::bot::Bot;
 use crate::commands::eval::Eval;
 use crate::commands::help::Help;
 use crate::commands::leek::{Leet, Mock, Owo};
-use crate::commands::quotes::{Grab, Quot};
+use crate::commands::quotes::{Grab, Quot, Search};
 use crate::commands::sed::Sed;
 use crate::commands::spotify::Spotify;
 use crate::commands::title::Title;
@@ -68,7 +68,7 @@ async fn main() -> anyhow::Result<()> {
 
     let cfg: UberConfig = toml::from_str(&client_conf)?;
 
-    let (db_exec, db_conn) = DbExecutor::create(cfg.db_path.as_deref().unwrap_or("uberbot.db3"))?;
+    let (db_exec, db_conn) = DbExecutor::create(cfg.bot.db_path.as_deref().unwrap_or("uberbot.db3"))?;
     let exec_thread = thread::spawn(move || db_exec.run());
 
     let uber_ver = concat!("Überbot ", env!("CARGO_PKG_VERSION"));
@@ -93,7 +93,7 @@ async fn main() -> anyhow::Result<()> {
     let (ctx, _) = broadcast::channel(1);
     let (etx, mut erx) = unbounded_channel();
 
-    let mut bot = Bot::new(cfg.irc.prefix, db_conn, 3, {
+    let mut bot = Bot::new(cfg.irc.prefix, db_conn, cfg.bot.history_depth, {
         let client = client.clone();
         move |target, msg| Ok(client.send_privmsg(target, msg)?)
     });
@@ -106,6 +106,7 @@ async fn main() -> anyhow::Result<()> {
     bot.add_command("ev".into(), Eval::default());
     bot.add_command("grab".into(), Grab);
     bot.add_command("quot".into(), Quot);
+    bot.add_command("qsearch".into(), Search::new(cfg.bot.search_limit.unwrap_or(3)));
     bot.add_trigger(
         Regex::new(r"^(?:(?<u>\S+):\s+)?s/(?<r>[^/]*)/(?<w>[^/]*)(?:/(?<f>[a-z]*))?\s*")?,
         Sed,

@@ -3,10 +3,17 @@ host = "karx.xyz"
 port = 6697
 tls = true
 username = "uberbot"
+nickname = "amazingbot"  # optional, default: same as username
 channels = ["#main", "#no-normies"]
-mode = "+B"
+mode = "+B"  # optional, default: none
 prefix = "u!"
 
-[spotify]
+[bot]
+db_path = "database.db3"  # optional, default: uberbot.db3
+history_depth = 5
+search_limit = 5  # optional, default: 3
+
+[spotify]  # optional, spotify module disabled if missing
 spotify_client_id = ""
 spotify_client_secret = ""
+
