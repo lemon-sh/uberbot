@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use tokio::sync::Mutex;
 
 fn dissect<'a>(prefix: &str, str: &'a str) -> Option<(&'a str, Option<&'a str>)> {
-    let str = str.trim().strip_prefix(prefix)?;
+    let str = str.strip_prefix(prefix)?;
     if let Some(o) = str.find(' ') {
         Some((&str[..o], Some(&str[o + 1..])))
     } else {
@@ -71,6 +71,7 @@ impl<SF: Fn(String, String) -> anyhow::Result<()>> Bot<SF> {
         author: &str,
         content: &str,
     ) -> anyhow::Result<()> {
+        let content = content.trim();
         if let Some((command, remainder)) = dissect(&self.prefix, content) {
             if let Some(handler) = self.commands.get(command) {
                 let msg = Context {

@@ -7,7 +7,10 @@ pub struct LastMsg;
 impl Command for LastMsg {
     async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
         let nick = msg.content.unwrap_or(msg.author);
-        let lastmsg = msg.history.read().await;
-        Ok(format!("{}: {:?}", nick, lastmsg.get(nick)))
+        Ok(format!(
+            "{}: {:?}",
+            nick,
+            msg.history.last_msgs(nick, usize::MAX).await
+        ))
     }
 }

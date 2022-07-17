@@ -26,19 +26,16 @@ impl Command for Grab {
         if author == msg.author {
             return Ok("You can't grab yourself.".into());
         }
-        let message = msg
-            .history
-            .last_msgs(author, count)
-            .await
-            .map(|v| v.join(" | "));
-        if let Some(message) = message {
+        let messages = msg.history.last_msgs(author, count).await;
+        if let Some(messages) = messages {
+            let message = messages.join(" | ");
             msg.db
                 .add_quote(Quote {
                     author: author.into(),
                     quote: message,
                 })
                 .await?;
-            Ok("Quote added ({} messages).".into())
+            Ok(format!("Quote added ({} messages).", messages.len()))
         } else {
             Ok("No previous messages to grab.".into())
         }
