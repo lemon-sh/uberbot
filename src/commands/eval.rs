@@ -15,7 +15,7 @@ impl Command for Eval {
             let mut meval_ctx = meval::Context::new();
             let value = meval::eval_str_with_context(expr, meval_ctx.var("x", *last_eval))?;
             *last_eval = value;
-            Ok(format!("{} = {}", expr, value))
+            Ok(format!("{} = {:.10}", expr, value))
         } else {
             Ok("No expression to evaluate".into())
         }
