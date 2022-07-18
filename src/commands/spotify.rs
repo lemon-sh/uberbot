@@ -47,11 +47,9 @@ async fn resolve_spotify(
     resource_type: &str,
     resource_id: &str,
 ) -> anyhow::Result<String> {
-    // uncomment this if titlebot commits suicide after exactly 30 minutes
-
-    /*if spotify.token.lock().await.unwrap().as_ref().unwrap().is_expired() {
+    if spotify.token.lock().await.unwrap().as_ref().unwrap().is_expired() {
         spotify.request_token().await?;
-    }*/
+    }
     tracing::debug!(
         "Resolving Spotify resource '{}' with id '{}'",
         resource_type,
