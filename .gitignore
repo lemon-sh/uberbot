@@ -1,5 +1,4 @@
 /target
-uberbot_*.toml
 uberbot.toml
 /Cargo.lock
 .idea

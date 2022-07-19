@@ -5,4 +5,5 @@ An IRC bot Above All [other bots].
 
 - [ ] Gitea webhook
 - [ ] sedbot flags
-- [ ] Quote search pagination
+- [*] Quote search pagination
+- [ ] Multiple prefixes
