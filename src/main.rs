@@ -10,7 +10,7 @@ use crate::bot::Bot;
 use crate::commands::eval::Eval;
 use crate::commands::help::Help;
 use crate::commands::leek::{Leet, Mock, Owo};
-use crate::commands::quotes::{Grab, Quot, Search};
+use crate::commands::quotes::{Grab, Quot, Search, SearchNext};
 use crate::commands::sed::Sed;
 use crate::commands::spotify::Spotify;
 use crate::commands::title::Title;
@@ -110,7 +110,9 @@ async fn main() -> anyhow::Result<()> {
     bot.add_command("ev".into(), Eval::default());
     bot.add_command("grab".into(), Grab);
     bot.add_command("quot".into(), Quot);
-    bot.add_command("qsearch".into(), Search::new(cfg.bot.search_limit.unwrap_or(3)));
+    let search_limit = cfg.bot.search_limit.unwrap_or(3);
+    bot.add_command("qsearch".into(), Search::new(search_limit));
+    bot.add_command("qnext".into(), SearchNext::new(search_limit));
     bot.add_trigger(
         Regex::new(r"^(?:(?<u>\S+):\s+)?s/(?<r>[^/]*)/(?<w>[^/]*)(?:/(?<f>[a-z]*))?\s*")?,
         Sed,

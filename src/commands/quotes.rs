@@ -16,6 +16,16 @@ impl Search {
     }
 }
 
+pub struct SearchNext {
+    limit: usize
+}
+
+impl SearchNext {
+    pub fn new(limit: usize) -> Self {
+        Self { limit }
+    }
+}
+
 #[async_trait]
 impl Command for Grab {
     async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
@@ -73,13 +83,38 @@ impl Command for Search {
         } else {
             return Ok("Invalid usage.".into());
         };
-        let results = msg.db.search_quotes(query.into(), self.limit).await?;
+        let results = msg.db.search_quotes(msg.author.into(), query.into(), self.limit).await?;
         if results.is_empty() {
             return Ok("No results.".into());
         }
-        let mut buf = format!("{}/{} results:\r\n", results.len(), self.limit);
-        for q in results {
+        let mut buf = String::new();
+        for q in &results {
             write!(buf, "\"{}\" ~{}\r\n", q.quote, q.author)?;
+        }
+        if results.len() == self.limit {
+            buf.push_str("Use 'qnext' for more results.");
+        }
+        Ok(buf)
+    }
+}
+
+#[async_trait]
+impl Command for SearchNext {
+    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
+        let results = if let Some(o) = msg.db.advance_search(msg.author.into(), self.limit).await? {
+            o
+        } else {
+            return Ok("You need to initiate a search first using 'qsearch'.".into())
+        };
+        if results.is_empty() {
+            return Ok("No results.".into());
+        }
+        let mut buf = String::new();
+        for q in &results {
+            write!(buf, "\"{}\" ~{}\r\n", q.quote, q.author)?;
+        }
+        if results.len() == self.limit {
+            buf.push_str("Use 'qnext' again for more results.");
         }
         Ok(buf)
     }
