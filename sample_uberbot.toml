@@ -16,6 +16,6 @@ history_depth = 5
 search_limit = 5  # optional, default: 3
 
 [spotify]  # optional, spotify module disabled if missing
-spotify_client_id = ""
-spotify_client_secret = ""
+client_id = ""
+client_secret = ""
 
