@@ -26,8 +26,16 @@ impl Trigger for Sed {
         };
         if let (Some(find), Some(replace)) = (captures.name("r"), captures.name("w")) {
             // TODO: karx plz add flags
-            //let flags = matches.name("f").map(|m| m.as_str());
-            let result = message.replace(find.as_str(), replace.as_str());
+            let (global, ignore_case) = captures
+                .name("f")
+                .map(|m| m.as_str())
+                .map(|s| (s.contains('g'), s.contains('i')))
+                .unwrap_or_default();
+            let result = if global {
+                message.replace(find.as_str(), replace.as_str())
+            } else {
+                message.replacen(find.as_str(), replace.as_str(), 1)
+            };
             if foreign_author {
                 Ok(format!(
                     "(edited by {}) <{}> {}",
