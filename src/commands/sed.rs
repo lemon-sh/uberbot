@@ -1,6 +1,8 @@
 use crate::bot::{Context, Trigger};
 use async_trait::async_trait;
+use fancy_regex::escape;
 use fancy_regex::Captures;
+use regex::RegexBuilder;
 
 pub struct Sed;
 
@@ -25,16 +27,21 @@ impl Trigger for Sed {
             return Ok("No previous messages found.".into());
         };
         if let (Some(find), Some(replace)) = (captures.name("r"), captures.name("w")) {
-            // TODO: karx plz add flags
             let (global, ignore_case) = captures
                 .name("f")
                 .map(|m| m.as_str())
                 .map(|s| (s.contains('g'), s.contains('i')))
                 .unwrap_or_default();
+
+            let escaped = escape(find.as_str());
+            let re = RegexBuilder::new(&escaped)
+                .case_insensitive(ignore_case)
+                .build()
+                .unwrap(); // Of course it's valid, we just escaped special chars
             let result = if global {
-                message.replace(find.as_str(), replace.as_str())
+                re.replace_all(&message, replace.as_str())
             } else {
-                message.replacen(find.as_str(), replace.as_str(), 1)
+                re.replace(&message, replace.as_str())
             };
             if foreign_author {
                 Ok(format!(

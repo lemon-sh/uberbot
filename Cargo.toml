@@ -25,6 +25,7 @@ rusqlite = { version = "0.28", features = ["bundled"] }
 futures-util = "0.3"
 irc = { version = "0.15", default-features = false, features = ["tls-rust"] }
 async-trait = "0.1"
+regex = "1.6.0"
 
 [features]
 # debug IRC commands
