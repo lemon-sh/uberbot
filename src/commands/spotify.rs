@@ -47,7 +47,15 @@ async fn resolve_spotify(
     resource_type: &str,
     resource_id: &str,
 ) -> anyhow::Result<String> {
-    if spotify.token.lock().await.unwrap().as_ref().unwrap().is_expired() {
+    if spotify
+        .token
+        .lock()
+        .await
+        .unwrap()
+        .as_ref()
+        .unwrap()
+        .is_expired()
+    {
         spotify.request_token().await?;
     }
     tracing::debug!(

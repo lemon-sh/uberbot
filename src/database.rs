@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use rusqlite::{params, OptionalExtension, Params};
 use serde::Serialize;
+use std::collections::HashMap;
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     oneshot,
@@ -14,8 +14,17 @@ enum Task {
         oneshot::Sender<rusqlite::Result<Option<Quote>>>,
         Option<String>,
     ),
-    StartSearch(oneshot::Sender<rusqlite::Result<Vec<Quote>>>, String, String, usize),
-    NextSearch(oneshot::Sender<rusqlite::Result<Option<Vec<Quote>>>>, String, usize)
+    StartSearch(
+        oneshot::Sender<rusqlite::Result<Vec<Quote>>>,
+        String,
+        String,
+        usize,
+    ),
+    NextSearch(
+        oneshot::Sender<rusqlite::Result<Option<Vec<Quote>>>>,
+        String,
+        usize,
+    ),
 }
 
 pub struct DbExecutor {
@@ -66,27 +75,43 @@ impl DbExecutor {
                     tx.send(result).unwrap();
                 }
                 Task::StartSearch(tx, user, query, limit) => {
-                    tx.send(self.start_search(&mut searches, user, query, limit)).unwrap();
+                    tx.send(self.start_search(&mut searches, user, query, limit))
+                        .unwrap();
                 }
                 Task::NextSearch(tx, user, limit) => {
-                    tx.send(self.next_search(&mut searches, &user, limit)).unwrap();
+                    tx.send(self.next_search(&mut searches, &user, limit))
+                        .unwrap();
                 }
             }
-            tracing::debug!("task took {}ms", Instant::now().duration_since(before).as_secs_f64()/1000.0)
+            tracing::debug!(
+                "task took {}ms",
+                Instant::now().duration_since(before).as_secs_f64() / 1000.0
+            )
         }
     }
 
-    fn start_search(&self, searches: &mut HashMap<String, (String, i64)>, user: String, query: String, limit: usize) -> rusqlite::Result<Vec<Quote>> {
+    fn start_search(
+        &self,
+        searches: &mut HashMap<String, (String, i64)>,
+        user: String,
+        query: String,
+        limit: usize,
+    ) -> rusqlite::Result<Vec<Quote>> {
         let (quotes, oid) = self.yield_quotes_oid("select oid,quote,username from quotes where quote like '%'||?1||'%' order by oid asc limit ?", params![query, limit])?;
         searches.insert(user, (query, oid));
         Ok(quotes)
     }
 
-    fn next_search(&self, searches: &mut HashMap<String, (String, i64)>, user: &str, limit: usize) -> rusqlite::Result<Option<Vec<Quote>>> {
+    fn next_search(
+        &self,
+        searches: &mut HashMap<String, (String, i64)>,
+        user: &str,
+        limit: usize,
+    ) -> rusqlite::Result<Option<Vec<Quote>>> {
         let (query, old_oid) = if let Some(o) = searches.get_mut(user) {
             o
         } else {
-            return Ok(None)
+            return Ok(None);
         };
         let (quotes, new_oid) = self.yield_quotes_oid("select oid,quote,username from quotes where oid > ? and quote like '%'||?||'%' order by oid asc limit ?", params![*old_oid, &*query, limit])?;
         if new_oid != -1 {
@@ -95,7 +120,11 @@ impl DbExecutor {
         Ok(Some(quotes))
     }
 
-    fn yield_quotes_oid<P: Params>(&self, sql: &str, params: P) -> rusqlite::Result<(Vec<Quote>, i64)> {
+    fn yield_quotes_oid<P: Params>(
+        &self,
+        sql: &str,
+        params: P,
+    ) -> rusqlite::Result<(Vec<Quote>, i64)> {
         let mut lastoid = -1i64;
         let quotes = self.db.prepare(sql).and_then(|mut v| {
             v.query(params).and_then(|mut v| {

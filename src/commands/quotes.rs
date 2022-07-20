@@ -7,7 +7,7 @@ pub struct Grab;
 pub struct Quot;
 
 pub struct Search {
-    limit: usize
+    limit: usize,
 }
 
 impl Search {
@@ -17,7 +17,7 @@ impl Search {
 }
 
 pub struct SearchNext {
-    limit: usize
+    limit: usize,
 }
 
 impl SearchNext {
@@ -83,7 +83,10 @@ impl Command for Search {
         } else {
             return Ok("Invalid usage.".into());
         };
-        let results = msg.db.search_quotes(msg.author.into(), query.into(), self.limit).await?;
+        let results = msg
+            .db
+            .search_quotes(msg.author.into(), query.into(), self.limit)
+            .await?;
         if results.is_empty() {
             return Ok("No results.".into());
         }
@@ -104,7 +107,7 @@ impl Command for SearchNext {
         let results = if let Some(o) = msg.db.advance_search(msg.author.into(), self.limit).await? {
             o
         } else {
-            return Ok("You need to initiate a search first using 'qsearch'.".into())
+            return Ok("You need to initiate a search first using 'qsearch'.".into());
         };
         if results.is_empty() {
             return Ok("No results.".into());

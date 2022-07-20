@@ -5,7 +5,7 @@ pub struct UberConfig {
     pub log_level: Option<String>,
     pub irc: IrcConfig,
     pub spotify: Option<SpotifyConfig>,
-    pub bot: BotConfig
+    pub bot: BotConfig,
 }
 
 #[derive(Deserialize)]
@@ -30,5 +30,5 @@ pub struct IrcConfig {
 pub struct BotConfig {
     pub db_path: Option<String>,
     pub history_depth: usize,
-    pub search_limit: Option<usize>
+    pub search_limit: Option<usize>,
 }

@@ -1,10 +1,10 @@
 #![allow(clippy::module_name_repetitions)]
 
 use fancy_regex::Regex;
-use std::{env, fs};
 use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
+use std::{env, fs};
 
 use crate::bot::Bot;
 use crate::commands::eval::Eval;
@@ -72,7 +72,8 @@ async fn main() -> anyhow::Result<()> {
         })
         .init();
 
-    let (db_exec, db_conn) = DbExecutor::create(cfg.bot.db_path.as_deref().unwrap_or("uberbot.db3"))?;
+    let (db_exec, db_conn) =
+        DbExecutor::create(cfg.bot.db_path.as_deref().unwrap_or("uberbot.db3"))?;
     let exec_thread = thread::spawn(move || db_exec.run());
 
     let uber_ver = concat!("Überbot ", env!("CARGO_PKG_VERSION"));

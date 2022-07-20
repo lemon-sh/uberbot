@@ -2,7 +2,9 @@ use crate::bot::{Command, Context};
 use async_trait::async_trait;
 
 const HELP: &str = concat!(
-    "=- \x1d\x02Überbot\x0f ", env!("CARGO_PKG_VERSION"), " -=\r\n",
+    "=- \x1d\x02Überbot\x0f ",
+    env!("CARGO_PKG_VERSION"),
+    " -=\r\n",
     " * waifu <category>      * grab [count] <user>\r\n",
     " * owo/mock/leet [user]  * quot <user>\r\n",
     " * ev <math expression>  * qsearch <query>\r\n",
