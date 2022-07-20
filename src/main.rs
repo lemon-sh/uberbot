@@ -15,6 +15,7 @@ use crate::commands::sed::Sed;
 use crate::commands::spotify::Spotify;
 use crate::commands::title::Title;
 use crate::commands::waifu::Waifu;
+use crate::web::HttpContext;
 use futures_util::stream::StreamExt;
 use irc::client::prelude::Config;
 use irc::client::{Client, ClientStream};
@@ -28,6 +29,7 @@ use tracing::Level;
 use crate::config::UberConfig;
 use crate::database::{DbExecutor, ExecutorConnection};
 
+mod web;
 mod bot;
 mod commands;
 mod config;
@@ -98,10 +100,21 @@ async fn main() -> anyhow::Result<()> {
     let (ctx, _) = broadcast::channel(1);
     let (etx, mut erx) = unbounded_channel();
 
-    let mut bot = Bot::new(cfg.irc.prefix, db_conn, cfg.bot.history_depth, {
+    let sf = {
         let client = client.clone();
         move |target, msg| Ok(client.send_privmsg(target, msg)?)
+    };
+
+    let http_task = cfg.web.map(|http| {
+        let http_ctx = ctx.subscribe();
+        let context = HttpContext { cfg: http, sendmsg: sf.clone() };
+        tokio::spawn(async move {
+            if let Err(e) = web::run(context, http_ctx).await {
+                tracing::error!("Fatal error in web service: {}", e);
+            }
+        })
     });
+    let mut bot = Bot::new(cfg.irc.prefix, db_conn, cfg.bot.history_depth, sf);
 
     bot.add_command("help".into(), Help);
     bot.add_command("waifu".into(), Waifu::default());
@@ -154,13 +167,13 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Closing services...");
     let _ = ctx.send(());
-    message_loop_task
-        .await
-        .unwrap_or_else(|e| tracing::warn!("Couldn't join the web service: {:?}", e));
+    message_loop_task.await.unwrap();
     tracing::info!("Message loop finished");
-    exec_thread
-        .join()
-        .unwrap_or_else(|e| tracing::warn!("Couldn't join the database: {:?}", e));
+    if let Some(t) = http_task {
+        t.await.unwrap();
+        tracing::info!("Web service finished");
+    }
+    exec_thread.join().unwrap();
     tracing::info!("DB Executor thread finished");
     tracing::info!("Shutdown complete!");
 

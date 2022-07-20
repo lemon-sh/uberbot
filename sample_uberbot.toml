@@ -19,3 +19,5 @@ search_limit = 5  # optional, default: 3
 client_id = ""
 client_secret = ""
 
+[web]  # optional, web service disabled if missing
+listen = "127.0.0.1:8080"
