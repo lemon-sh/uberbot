@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, collections::HashMap};
 
 use serde::Deserialize;
 
@@ -39,4 +39,5 @@ pub struct BotConfig {
 #[derive(Deserialize)]
 pub struct HttpConfig {
     pub listen: SocketAddr,
+    pub webhooks: HashMap<String, String>
 }
