@@ -49,6 +49,7 @@ where
     };
     let body_bytes = to_bytes(req.into_body()).await?;
     let body = String::from_utf8_lossy(&body_bytes);
+    tracing::debug!("received request: {}", body);
     let response = parser::textify(&body, &webhook)?;
     (ctx.sendmsg)(channel.to_string(), response)?;
     let resp = Response::builder()
