@@ -56,7 +56,8 @@ impl DbExecutor {
             let before = Instant::now();
             tracing::debug!("got task {:?}", task);
             match task {
-                Task::AddQuote(tx, quote) => {
+                Task::AddQuote(tx, mut quote) => {
+                    quote.author.make_ascii_lowercase();
                     let result = self
                         .db
                         .execute(
@@ -67,8 +68,9 @@ impl DbExecutor {
                     tx.send(result).unwrap();
                 }
                 Task::GetQuote(tx, author) => {
-                    let result = if let Some(ref author) = author {
-                        self.db.query_row("select quote,username from quotes where username=? order by random() limit 1", params![author], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
+                    let result = if let Some(mut author) = author {
+                        author.make_ascii_lowercase();
+                        self.db.query_row("select quote,username from quotes where username glob ? order by random() limit 1", params![author], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
                     } else {
                         self.db.query_row("select quote,username from quotes order by random() limit 1", params![], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
                     }.optional();
