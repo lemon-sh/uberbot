@@ -8,12 +8,12 @@ username = "uberbot"
 nickname = "amazingbot"  # optional, default: same as username
 channels = ["#main", "#no-normies"]
 mode = "+B"  # optional, default: none
-prefix = "u!"
 
 [bot]
 db_path = "database.db3"  # optional, default: uberbot.db3
 history_depth = 5
 search_limit = 5  # optional, default: 3
+prefixes = ["u!", "yo uberbot "]
 
 [spotify]  # optional, spotify module disabled if missing
 client_id = ""

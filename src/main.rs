@@ -3,7 +3,7 @@
 use fancy_regex::Regex;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::thread;
+use std::{thread, process};
 use std::{env, fs};
 
 use crate::bot::Bot;
@@ -74,6 +74,11 @@ async fn main() -> anyhow::Result<()> {
         })
         .init();
 
+    if cfg.bot.prefixes.is_empty() {
+        tracing::error!("You have to specify at least one prefix");
+        process::exit(1);
+    }
+
     let (db_exec, db_conn) =
         DbExecutor::create(cfg.bot.db_path.as_deref().unwrap_or("uberbot.db3"))?;
     let exec_thread = thread::spawn(move || db_exec.run());
@@ -114,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
             }
         })
     });
-    let mut bot = Bot::new(cfg.irc.prefix, db_conn, cfg.bot.history_depth, sf);
+    let mut bot = Bot::new(cfg.bot.prefixes, db_conn, cfg.bot.history_depth, sf);
 
     bot.add_command("help".into(), Help);
     bot.add_command("waifu".into(), Waifu::default());

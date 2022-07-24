@@ -5,13 +5,17 @@ use fancy_regex::{Captures, Regex};
 use std::collections::HashMap;
 use tokio::sync::Mutex;
 
-fn dissect<'a>(prefix: &str, str: &'a str) -> Option<(&'a str, Option<&'a str>)> {
-    let str = str.strip_prefix(prefix)?;
-    if let Some(o) = str.find(' ') {
-        Some((&str[..o], Some(&str[o + 1..])))
-    } else {
-        Some((str, None))
+fn dissect<'a>(prefixes: &[String], str: &'a str) -> Option<(&'a str, Option<&'a str>)> {
+    for prefix in prefixes {
+        if let Some(str) = str.strip_prefix(prefix) {
+            return if let Some(o) = str.find(' ') {
+                Some((&str[..o], Some(&str[o + 1..])))
+            } else {
+                Some((str, None))
+            }
+        }
     }
+    None
 }
 
 #[async_trait]
@@ -38,7 +42,7 @@ pub struct Context<'a> {
 
 pub struct Bot<SF: Fn(String, String) -> anyhow::Result<()>> {
     history: MessageHistory,
-    prefix: String,
+    prefixes: Vec<String>,
     db: ExecutorConnection,
     commands: HashMap<String, Box<Mutex<dyn Command + Send>>>,
     triggers: Vec<(Regex, Box<Mutex<dyn Trigger + Send>>)>,
@@ -46,12 +50,12 @@ pub struct Bot<SF: Fn(String, String) -> anyhow::Result<()>> {
 }
 
 impl<SF: Fn(String, String) -> anyhow::Result<()>> Bot<SF> {
-    pub fn new(prefix: String, db: ExecutorConnection, hdepth: usize, sendmsg: SF) -> Self {
+    pub fn new(prefixes: Vec<String>, db: ExecutorConnection, hdepth: usize, sendmsg: SF) -> Self {
         Bot {
             history: MessageHistory::new(hdepth),
             commands: HashMap::new(),
             triggers: Vec::new(),
-            prefix,
+            prefixes,
             db,
             sendmsg,
         }
@@ -72,7 +76,8 @@ impl<SF: Fn(String, String) -> anyhow::Result<()>> Bot<SF> {
         content: &str,
     ) -> anyhow::Result<()> {
         let content = content.trim();
-        if let Some((command, remainder)) = dissect(&self.prefix, content) {
+        if let Some((command, remainder)) = dissect(&self.prefixes, content) {
+            tracing::debug!("Got command: {:?} -> {:?}", command, remainder);
             if let Some(handler) = self.commands.get(command) {
                 let msg = Context {
                     author,
