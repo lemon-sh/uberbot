@@ -14,7 +14,7 @@ impl Title {
     pub fn new() -> anyhow::Result<Self> {
         Ok(Title {
             http: Client::new(),
-            title_regex: Regex::new(r"(?<=<title>)(.*)(?=</title>)")?,
+            title_regex: Regex::new(r"<title[^>]*>(.*?)</title>")?,
         })
     }
 }
@@ -40,7 +40,7 @@ impl Trigger for Title {
             .unwrap_or("text/html");
         if mime.contains("text/html") {
             let body = response.text().await?;
-            if let Some(tm) = self.title_regex.find(&body)? {
+            if let Some(tm) = self.title_regex.captures(&body)?.and_then(|c| c.get(1)) {
                 let title_match = tm.as_str();
                 let result = decode_html(title_match).unwrap_or_else(|_| title_match.to_string());
                 Ok(format!("\x039[Title]\x0311 {}", result))
