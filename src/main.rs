@@ -22,7 +22,7 @@ use irc::client::{Client, ClientStream};
 use irc::proto::{ChannelExt, Command, Prefix};
 use rspotify::Credentials;
 use tokio::select;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 use tokio::sync::mpsc::unbounded_channel;
 use tracing::Level;
 
@@ -185,23 +185,30 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn message_loop<SF: Fn(String, String) -> anyhow::Result<()>>(
+async fn message_loop<SF>(
     mut stream: ClientStream,
     bot: Bot<SF>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()> where SF: Fn(String, String) -> anyhow::Result<()> + Send + Sync + 'static {
+    let bot = Arc::new(bot);
+    let (cancelled_send, mut cancelled_recv) = mpsc::channel::<()>(1);
     while let Some(message) = stream.next().await.transpose()? {
-        if let Command::PRIVMSG(ref origin, content) = message.command {
+        if let Command::PRIVMSG(origin, content) = message.command {
             if origin.is_channel_name() {
-                if let Some(author) = message.prefix.as_ref().and_then(|p| match p {
-                    Prefix::Nickname(name, _, _) => Some(&name[..]),
+                if let Some(author) = message.prefix.and_then(|p| match p {
+                    Prefix::Nickname(name, _, _) => Some(name),
                     Prefix::ServerName(_) => None,
                 }) {
-                    bot.handle_message(origin, author, &content).await;
+                    let bot = bot.clone();
+                    let cancelled_send = cancelled_send.clone();
+                    tokio::spawn(async move {
+                        bot.handle_message(origin, author, content, cancelled_send).await;
+                    });
                 } else {
                     tracing::warn!("Couldn't get the author for a message");
                 }
             }
         }
     }
+    let _ = cancelled_recv.recv().await;
     Ok(())
 }
