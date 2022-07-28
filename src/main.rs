@@ -3,8 +3,8 @@
 use fancy_regex::Regex;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::{thread, process};
 use std::{env, fs};
+use std::{process, thread};
 
 use crate::bot::Bot;
 use crate::commands::eval::Eval;
@@ -22,19 +22,19 @@ use irc::client::{Client, ClientStream};
 use irc::proto::{ChannelExt, Command, Prefix};
 use rspotify::Credentials;
 use tokio::select;
-use tokio::sync::{broadcast, mpsc};
 use tokio::sync::mpsc::unbounded_channel;
+use tokio::sync::{broadcast, mpsc};
 use tracing::Level;
 
 use crate::config::UberConfig;
 use crate::database::{DbExecutor, ExecutorConnection};
 
-mod web;
 mod bot;
 mod commands;
 mod config;
 mod database;
 mod history;
+mod web;
 
 #[cfg(unix)]
 async fn terminate_signal() {
@@ -112,7 +112,10 @@ async fn main() -> anyhow::Result<()> {
 
     let http_task = cfg.web.map(|http| {
         let http_ctx = ctx.subscribe();
-        let context = HttpContext { cfg: http, sendmsg: sf.clone() };
+        let context = HttpContext {
+            cfg: http,
+            sendmsg: sf.clone(),
+        };
         tokio::spawn(async move {
             if let Err(e) = web::run(context, http_ctx).await {
                 tracing::error!("Fatal error in web service: {}", e);
@@ -185,10 +188,10 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn message_loop<SF>(
-    mut stream: ClientStream,
-    bot: Bot<SF>,
-) -> anyhow::Result<()> where SF: Fn(String, String) -> anyhow::Result<()> + Send + Sync + 'static {
+async fn message_loop<SF>(mut stream: ClientStream, bot: Bot<SF>) -> anyhow::Result<()>
+where
+    SF: Fn(String, String) -> anyhow::Result<()> + Send + Sync + 'static,
+{
     let bot = Arc::new(bot);
     let (cancelled_send, mut cancelled_recv) = mpsc::channel::<()>(1);
     while let Some(message) = stream.next().await.transpose()? {
@@ -201,7 +204,8 @@ async fn message_loop<SF>(
                     let bot = bot.clone();
                     let cancelled_send = cancelled_send.clone();
                     tokio::spawn(async move {
-                        bot.handle_message(origin, author, content, cancelled_send).await;
+                        bot.handle_message(origin, author, content, cancelled_send)
+                            .await;
                     });
                 } else {
                     tracing::warn!("Couldn't get the author for a message");

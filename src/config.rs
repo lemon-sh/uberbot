@@ -1,4 +1,4 @@
-use std::{net::SocketAddr, collections::HashMap};
+use std::{collections::HashMap, net::SocketAddr};
 
 use serde::Deserialize;
 
@@ -8,7 +8,7 @@ pub struct UberConfig {
     pub irc: IrcConfig,
     pub spotify: Option<SpotifyConfig>,
     pub bot: BotConfig,
-    pub web: Option<HttpConfig>
+    pub web: Option<HttpConfig>,
 }
 
 #[derive(Deserialize)]
@@ -39,5 +39,5 @@ pub struct BotConfig {
 #[derive(Deserialize)]
 pub struct HttpConfig {
     pub listen: SocketAddr,
-    pub webhooks: HashMap<String, String>
+    pub webhooks: HashMap<String, String>,
 }

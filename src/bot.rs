@@ -3,7 +3,7 @@ use crate::ExecutorConnection;
 use async_trait::async_trait;
 use fancy_regex::{Captures, Regex};
 use std::collections::HashMap;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::{mpsc, Mutex};
 
 fn dissect<'a>(prefixes: &[String], str: &'a str) -> Option<(&'a str, Option<&'a str>)> {
     for prefix in prefixes {
@@ -12,7 +12,7 @@ fn dissect<'a>(prefixes: &[String], str: &'a str) -> Option<(&'a str, Option<&'a
                 Some((&str[..o], Some(&str[o + 1..])))
             } else {
                 Some((str, None))
-            }
+            };
         }
     }
     None
@@ -108,7 +108,13 @@ impl<SF: Fn(String, String) -> anyhow::Result<()>> Bot<SF> {
         Ok(())
     }
 
-    pub async fn handle_message(&self, origin: String, author: String, content: String, _cancel_handle: mpsc::Sender<()>) {
+    pub async fn handle_message(
+        &self,
+        origin: String,
+        author: String,
+        content: String,
+        _cancel_handle: mpsc::Sender<()>,
+    ) {
         if let Err(e) = self.handle_message_inner(&origin, &author, &content).await {
             let _err = (self.sendmsg)(origin.into(), format!("Error: {}", e));
         }

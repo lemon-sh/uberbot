@@ -1,9 +1,10 @@
 use std::{convert::Infallible, sync::Arc};
 
 use hyper::{
+    body::to_bytes,
     header::HeaderValue,
     service::{make_service_fn, service_fn},
-    Body, Request, Response, Server, StatusCode, body::to_bytes,
+    Body, Request, Response, Server, StatusCode,
 };
 use tokio::sync::broadcast;
 

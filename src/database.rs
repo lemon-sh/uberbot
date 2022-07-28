@@ -99,7 +99,10 @@ impl DbExecutor {
         query: String,
         limit: usize,
     ) -> rusqlite::Result<Vec<Quote>> {
-        let (quotes, oid) = self.yield_quotes_oid("select oid,quote,username from quotes where quote match ? order by oid asc limit ?", params![query, limit])?;
+        let (quotes, oid) = self.yield_quotes_oid(
+            "select oid,quote,username from quotes where quote match ? order by oid asc limit ?",
+            params![query, limit],
+        )?;
         searches.insert(user, (query, oid));
         Ok(quotes)
     }
