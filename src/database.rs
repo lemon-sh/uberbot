@@ -43,7 +43,7 @@ impl DbExecutor {
         let (tx, rx) = unbounded_channel();
         let db = rusqlite::Connection::open(dbpath)?;
         db.execute(
-            "create table if not exists quotes(id integer primary key, username text not null, quote text not null)",
+            "create virtual table if not exists quotes using fts5(username, quote)",
             [],
         )?;
         tracing::debug!("Database connected ({})", dbpath);
@@ -70,7 +70,7 @@ impl DbExecutor {
                 Task::GetQuote(tx, author) => {
                     let result = if let Some(mut author) = author {
                         author.make_ascii_lowercase();
-                        self.db.query_row("select quote,username from quotes where username glob ? order by random() limit 1", params![author], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
+                        self.db.query_row("select quote,username from quotes where username match ? order by random() limit 1", params![author], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
                     } else {
                         self.db.query_row("select quote,username from quotes order by random() limit 1", params![], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
                     }.optional();
@@ -99,7 +99,7 @@ impl DbExecutor {
         query: String,
         limit: usize,
     ) -> rusqlite::Result<Vec<Quote>> {
-        let (quotes, oid) = self.yield_quotes_oid("select oid,quote,username from quotes where quote like '%'||?1||'%' order by oid asc limit ?", params![query, limit])?;
+        let (quotes, oid) = self.yield_quotes_oid("select oid,quote,username from quotes where quote match ? order by oid asc limit ?", params![query, limit])?;
         searches.insert(user, (query, oid));
         Ok(quotes)
     }
@@ -115,7 +115,7 @@ impl DbExecutor {
         } else {
             return Ok(None);
         };
-        let (quotes, new_oid) = self.yield_quotes_oid("select oid,quote,username from quotes where oid > ? and quote like '%'||?||'%' order by oid asc limit ?", params![*old_oid, &*query, limit])?;
+        let (quotes, new_oid) = self.yield_quotes_oid("select oid,quote,username from quotes where oid > ? and quote match ? order by oid asc limit ?", params![*old_oid, &*query, limit])?;
         if new_oid != -1 {
             *old_oid = new_oid;
         }
