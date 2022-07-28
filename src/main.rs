@@ -1,4 +1,5 @@
-#![allow(clippy::module_name_repetitions)]
+#![warn(clippy::pedantic)]
+#![allow(clippy::module_name_repetitions, clippy::too_many_lines)]
 
 use fancy_regex::Regex;
 use std::str::FromStr;

@@ -116,7 +116,7 @@ impl<SF: Fn(String, String) -> anyhow::Result<()>> Bot<SF> {
         _cancel_handle: mpsc::Sender<()>,
     ) {
         if let Err(e) = self.handle_message_inner(&origin, &author, &content).await {
-            let _err = (self.sendmsg)(origin.into(), format!("Error: {}", e));
+            let _err = (self.sendmsg)(origin, format!("Error: {}", e));
         }
     }
 }

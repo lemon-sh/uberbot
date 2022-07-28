@@ -88,7 +88,7 @@ impl DbExecutor {
             tracing::debug!(
                 "task took {}ms",
                 Instant::now().duration_since(before).as_secs_f64() / 1000.0
-            )
+            );
         }
     }
 
