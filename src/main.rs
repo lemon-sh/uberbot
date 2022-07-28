@@ -209,6 +209,7 @@ async fn message_loop<SF>(
             }
         }
     }
+    drop(cancelled_send);
     let _ = cancelled_recv.recv().await;
     Ok(())
 }
