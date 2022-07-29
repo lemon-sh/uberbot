@@ -21,3 +21,9 @@ client_secret = ""
 
 [web]  # optional, web service disabled if missing
 listen = "127.0.0.1:8080"
+
+[web.webhooks]  # only required when the web service is enabled
+# format: "<path>" = "<irc channel>"
+# for example:
+"devel" = "#dev"  # http://127.0.0.1:8080/devel
+"chaospeople" = "#chaos"  # http://127.0.0.1:8080/chaospeople
