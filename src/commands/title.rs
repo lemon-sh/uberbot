@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use fancy_regex::{Captures, Regex};
 use htmlescape::decode_html;
 use hyper::header::HeaderValue;
+use hyper::Uri;
 use reqwest::Client;
 
 pub struct Title {
@@ -28,6 +29,10 @@ impl Trigger for Title {
     ) -> anyhow::Result<String> {
         let url = captures.get(0).unwrap().as_str();
         tracing::debug!("url: {}", url);
+
+        if url.parse::<Uri>().is_err() {
+            return Ok("\x039[Title]\x0311 Invalid URL".into());
+        }
 
         let request = self.http.get(url).build()?;
         let response = self.http.execute(request).await?;
