@@ -1,6 +1,5 @@
 use crate::bot::{Context, Trigger};
 use async_trait::async_trait;
-use fancy_regex::escape;
 use fancy_regex::Captures;
 use regex::RegexBuilder;
 
@@ -33,11 +32,9 @@ impl Trigger for Sed {
                 .map(|s| (s.contains('g'), s.contains('i')))
                 .unwrap_or_default();
 
-            let escaped = escape(find.as_str());
-            let re = RegexBuilder::new(&escaped)
+            let re = RegexBuilder::new(find.as_str())
                 .case_insensitive(ignore_case)
-                .build()
-                .unwrap(); // Of course it's valid, we just escaped special chars
+                .build()?;
             let result = if global {
                 re.replace_all(&message, replace.as_str())
             } else {

@@ -147,7 +147,7 @@ async fn main() -> anyhow::Result<()> {
     } else {
         tracing::warn!("Spotify module is disabled, because the config is missing");
     }
-    bot.add_trigger(Regex::new(r"https?://[^\s/$.?#].\S*")?, Title::new()?);
+    bot.add_trigger(Regex::new(r"https?://[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b[-a-zA-Z0-9()@:%_\+.~#?&//=]*")?, Title::new()?);
     #[cfg(feature = "debug")]
     {
         use commands::debug::*;
