@@ -78,6 +78,10 @@ impl<SF: Fn(String, String) -> anyhow::Result<()>> Bot<SF> {
         let content = content.trim();
         if let Some((command, remainder)) = dissect(&self.prefixes, content) {
             tracing::debug!("Got command: {:?} -> {:?}", command, remainder);
+            if command.is_empty() {
+                tracing::debug!("Empty command, skipping...");
+                return Ok(());
+            }
             if let Some(handler) = self.commands.get(command) {
                 let msg = Context {
                     author,
