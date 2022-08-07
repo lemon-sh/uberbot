@@ -8,6 +8,7 @@ const HELP: &str = concat!(
     " * waifu <category>      * grab [count] <user>\r\n",
     " * owo/mock/leet [user]  * quot <user>\r\n",
     " * ev <math expression>  * qsearch <query>\r\n",
+    " * play [count]          * dbg [count]\r\n",
     " - This bot can also resolve HTML titles, Spotify links and a subset of sed expressions."
 );
 
