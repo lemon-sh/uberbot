@@ -38,6 +38,7 @@ mod config;
 mod database;
 mod history;
 mod web;
+mod util;
 
 #[cfg(unix)]
 async fn terminate_signal() {
@@ -156,6 +157,7 @@ async fn main() -> anyhow::Result<()> {
     {
         use commands::debug::*;
         bot.add_command("lastmsg".into(), LastMsg);
+        bot.add_command("sleep".into(), Sleep)
     }
 
     let message_loop_task = tokio::spawn(async move {
