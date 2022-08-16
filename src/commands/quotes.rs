@@ -1,4 +1,4 @@
-use crate::bot::{Command, Context};
+use crate::bot::{Command, CommandContext};
 use crate::database::Quote;
 use async_trait::async_trait;
 use std::fmt::Write;
@@ -28,7 +28,7 @@ impl SearchNext {
 
 #[async_trait]
 impl Command for Grab {
-    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
+    async fn execute(&self, msg: CommandContext) -> anyhow::Result<String> {
         let content = if let Some(c) = msg.content {
             c
         } else {
@@ -65,8 +65,8 @@ impl Command for Grab {
 
 #[async_trait]
 impl Command for Quot {
-    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
-        let author = msg.content.map(ToString::to_string);
+    async fn execute(&self, msg: CommandContext) -> anyhow::Result<String> {
+        let author = msg.content;
         if let Some(q) = msg.db.get_quote(author).await? {
             Ok(format!("\"{}\" ~{}", q.quote, q.author))
         } else {
@@ -77,7 +77,7 @@ impl Command for Quot {
 
 #[async_trait]
 impl Command for Search {
-    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
+    async fn execute(&self, msg: CommandContext) -> anyhow::Result<String> {
         let query = if let Some(c) = msg.content {
             c
         } else {
@@ -103,7 +103,7 @@ impl Command for Search {
 
 #[async_trait]
 impl Command for SearchNext {
-    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String> {
+    async fn execute(&self, msg: CommandContext) -> anyhow::Result<String> {
         let results = if let Some(o) = msg.db.advance_search(msg.author.into(), self.limit).await? {
             o
         } else {

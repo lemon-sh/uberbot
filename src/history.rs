@@ -52,16 +52,16 @@ impl MessageHistory {
         false
     }
 
-    pub async fn add_message(&self, user: &str, message: &str) {
+    pub async fn add_message(&self, user: &str, message: String) {
         let mut map = self.map.write().await;
         if let Some(deque) = map.get_mut(user) {
             if deque.len() == self.maxlen {
                 deque.remove(deque.len() - 1);
             }
-            deque.push_front(message.to_string());
+            deque.push_front(message);
         } else {
             let mut deque = VecDeque::with_capacity(self.maxlen);
-            deque.push_front(message.to_string());
+            deque.push_front(message);
             map.insert(user.to_string(), deque);
         }
     }

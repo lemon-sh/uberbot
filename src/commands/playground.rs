@@ -1,6 +1,6 @@
 mod util;
 
-use crate::bot::{Command, Context};
+use crate::bot::{Command, CommandContext};
 use anyhow::anyhow;
 use anyhow::bail;
 use async_trait::async_trait;
@@ -56,7 +56,7 @@ impl<'de> Deserialize<'de> for PlayResult {
     }
 }
 
-async fn play_eval_base(client: &Client, ctx: &Context<'_>, dbg: bool) -> anyhow::Result<String> {
+async fn play_eval_base(client: &Client, ctx: CommandContext, dbg: bool) -> anyhow::Result<String> {
     let count = ctx
         .content
         .ok_or_else(|| anyhow!("No count specified"))?
@@ -64,7 +64,7 @@ async fn play_eval_base(client: &Client, ctx: &Context<'_>, dbg: bool) -> anyhow
 
     let messages = ctx
         .history
-        .last_msgs(ctx.author, count)
+        .last_msgs(&ctx.author, count)
         .await
         .ok_or_else(|| anyhow!("No code to run!"))?;
 
@@ -129,8 +129,8 @@ pub struct Play {
 
 #[async_trait]
 impl Command for Play {
-    async fn execute(&mut self, ctx: Context<'_>) -> anyhow::Result<String> {
-        play_eval_base(&self.client, &ctx, false).await
+    async fn execute(&self, ctx: CommandContext) -> anyhow::Result<String> {
+        play_eval_base(&self.client, ctx, false).await
     }
 }
 
@@ -141,7 +141,7 @@ pub struct Dbg {
 
 #[async_trait]
 impl Command for Dbg {
-    async fn execute(&mut self, ctx: Context<'_>) -> anyhow::Result<String> {
-        play_eval_base(&self.client, &ctx, true).await
+    async fn execute(&self, ctx: CommandContext) -> anyhow::Result<String> {
+        play_eval_base(&self.client, ctx, true).await
     }
 }
