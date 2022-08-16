@@ -9,7 +9,7 @@ pub struct OwnedCaptures {
 
 impl OwnedCaptures {
     pub fn get(&self, i: usize) -> Option<&str> {
-        let range: &Range<usize> = self.captures.get(i)?;
+        let range = self.captures.get(i)?;
         Some(&self.text[range.start..range.end])
     }
 
