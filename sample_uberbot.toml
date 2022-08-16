@@ -16,6 +16,7 @@ search_limit = 5  # optional, default: 3
 prefixes = ["u!", "yo uberbot "]
 
 [spotify]  # optional, spotify module disabled if missing
+# you can get those from https://developer.spotify.com/dashboard/
 client_id = ""
 client_secret = ""
 
