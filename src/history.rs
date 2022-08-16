@@ -24,15 +24,11 @@ impl MessageHistory {
     pub async fn last_msgs(&self, user: &str, count: usize) -> Option<Vec<String>> {
         let map = self.map.read().await;
         if let Some(deque) = map.get(user) {
-            let count = if deque.len() < count {
-                deque.len()
-            } else {
-                count
-            };
+            let len = deque.len();
+            let count = len.min(count);
             Some(
                 deque
-                    .range(..count)
-                    .rev()
+                    .range(len-count..)
                     .map(ToString::to_string)
                     .collect(),
             )
@@ -41,10 +37,10 @@ impl MessageHistory {
         }
     }
 
-    pub async fn edit_message(&self, user: &str, pos: usize, edited: String) -> bool {
+    pub async fn edit_message(&self, user: &str, depth: usize, edited: String) -> bool {
         let mut map = self.map.write().await;
         if let Some(deque) = map.get_mut(user) {
-            if let Some(old) = deque.get_mut(pos) {
+            if let Some(old) = deque.get_mut(deque.len()-1-depth) {
                 *old = edited;
                 return true;
             }
@@ -56,12 +52,12 @@ impl MessageHistory {
         let mut map = self.map.write().await;
         if let Some(deque) = map.get_mut(user) {
             if deque.len() == self.maxlen {
-                deque.remove(deque.len() - 1);
+                deque.pop_front();
             }
-            deque.push_front(message);
+            deque.push_back(message);
         } else {
             let mut deque = VecDeque::with_capacity(self.maxlen);
-            deque.push_front(message);
+            deque.push_back(message);
             map.insert(user.to_string(), deque);
         }
     }
