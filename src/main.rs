@@ -151,7 +151,7 @@ async fn main() -> anyhow::Result<()> {
     } else {
         tracing::warn!("Spotify module is disabled, because the config is missing");
     }
-    bot.add_trigger(Regex::new(r"https?://[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b[-a-zA-Z0-9()@:%_\+.~#?&//=]*")?, Title::new()?);
+    bot.add_trigger(Regex::new(r"https?://[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b[-a-zA-Z0-9()@:%_+.~#?&/=]*")?, Title::new()?);
     #[cfg(feature = "debug")]
     {
         use commands::debug::*;
@@ -197,7 +197,6 @@ async fn message_loop<SF>(mut stream: ClientStream, bot: Bot<SF>) -> anyhow::Res
 where
     SF: Fn(String, String) -> anyhow::Result<()> + Send + Sync + 'static,
 {
-    let bot = Arc::new(bot);
     let (cancelled_send, mut cancelled_recv) = mpsc::channel::<()>(1);
     while let Some(message) = stream.next().await.transpose()? {
         if let Command::PRIVMSG(origin, content) = message.command {
@@ -206,12 +205,9 @@ where
                     Prefix::Nickname(name, _, _) => Some(name),
                     Prefix::ServerName(_) => None,
                 }) {
-                    let bot = bot.clone();
                     let cancelled_send = cancelled_send.clone();
-                    tokio::spawn(async move {
-                        bot.handle_message(origin, author, content, cancelled_send)
-                            .await;
-                    });
+                    bot.handle_message(origin, author, content, cancelled_send)
+                        .await;
                 } else {
                     tracing::warn!("Couldn't get the author for a message");
                 }
