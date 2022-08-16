@@ -1,6 +1,6 @@
-use crate::bot::{Context, Trigger};
+use crate::bot::{Trigger, TriggerContext};
 use async_trait::async_trait;
-use fancy_regex::{Captures, Regex};
+use fancy_regex::Regex;
 use htmlescape::decode_html;
 use hyper::header::HeaderValue;
 use reqwest::Client;
@@ -21,12 +21,8 @@ impl Title {
 
 #[async_trait]
 impl Trigger for Title {
-    async fn execute<'a>(
-        &mut self,
-        _msg: Context<'a>,
-        captures: Captures<'a>,
-    ) -> anyhow::Result<String> {
-        let url = captures.get(0).unwrap().as_str();
+    async fn execute(&self, ctx: TriggerContext) -> anyhow::Result<String> {
+        let url = ctx.captures.get(0).unwrap();
         tracing::debug!("url: {}", url);
 
         let request = self.http.get(url).build()?;

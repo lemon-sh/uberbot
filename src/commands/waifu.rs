@@ -10,7 +10,7 @@ pub struct Waifu {
 
 #[async_trait]
 impl Command for Waifu {
-    async fn execute(&mut self, msg: CommandContext) -> anyhow::Result<String> {
+    async fn execute(&self, msg: CommandContext) -> anyhow::Result<String> {
         let category = msg.content.as_deref().unwrap_or("waifu");
         let request = self
             .http

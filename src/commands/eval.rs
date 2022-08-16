@@ -15,7 +15,7 @@ impl Command for Eval {
             let mut last_eval = self.last_eval.lock().await;
             let last_eval = last_eval.entry(msg.author.into()).or_insert(0.0);
             let mut meval_ctx = meval::Context::new();
-            let value = meval::eval_str_with_context(expr, meval_ctx.var("x", *last_eval))?;
+            let value = meval::eval_str_with_context(&expr, meval_ctx.var("x", *last_eval))?;
             *last_eval = value;
             Ok(format!("{} = {:.10}", expr, value))
         } else {

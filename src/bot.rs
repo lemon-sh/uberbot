@@ -5,6 +5,7 @@ use fancy_regex::Regex;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+use crate::util::{FancyRegexExt, OwnedCaptures};
 
 #[async_trait]
 pub trait Trigger {
@@ -26,8 +27,8 @@ pub struct CommandContext {
 pub struct TriggerContext {
     pub history: Arc<MessageHistory>,
     pub author: String,
-    pub content: String,
-    pub groups: HashMap<String, String>,
+    // we can omit content because it's the same as captures.get(0).unwrap()
+    pub captures: OwnedCaptures,
     pub db: ExecutorConnection,
 }
 
@@ -36,7 +37,7 @@ pub struct Bot<SF: Fn(String, String) -> anyhow::Result<()>> {
     prefixes: Vec<String>,
     db: ExecutorConnection,
     commands: HashMap<String, Arc<dyn Command + Send + Sync>>,
-    triggers: Vec<(Regex, Vec<String>, Arc<dyn Trigger + Send + Sync>)>,
+    triggers: Vec<(Regex, Arc<dyn Trigger + Send + Sync>)>,
     sendmsg: Arc<SF>,
 }
 
@@ -76,10 +77,9 @@ where
     pub fn add_trigger<C: Trigger + Send + Sync + 'static>(
         &mut self,
         regex: Regex,
-        groups: Vec<String>,
         cmd: C,
     ) {
-        self.triggers.push((regex, groups, Arc::new(cmd)));
+        self.triggers.push((regex, Arc::new(cmd)));
     }
 
     pub(crate) async fn handle_message(
@@ -98,8 +98,8 @@ where
             }
             // now we need to find a handler for this command
             if let Some(handler) = self.commands.get(command) {
-                // we found a handler, we can now execute it in a spawned task
-                let msg = CommandContext {
+                // we found a command, we can now spawn its handler
+                let ctx = CommandContext {
                     author,
                     content: remainder.map(ToString::to_string),
                     db: self.db.clone(),
@@ -110,7 +110,7 @@ where
                 tokio::spawn(async move {
                     let _cancel = cancel;
                     let result = handler
-                        .execute(msg)
+                        .execute(ctx)
                         .await
                         .unwrap_or_else(|e| format!("Error: {}", e));
                     (sendmsg)(origin, result)
@@ -124,24 +124,14 @@ where
         // at this point we need to make the message owned
         let content = content.to_string();
         // the message is not a command, maybe it's a trigger?
-        for (trigger, groups, handler) in &self.triggers {
-            let captures = trigger.captures(&content).unwrap();
+        for (trigger, handler) in &self.triggers {
+            let captures = trigger.owned_captures(&content).unwrap();
             // we need to find a regex that matches this message
             if let Some(captures) = captures {
-                // we found a trigger for this message - now we need to extract the named groups that it wants...
-                let groups = groups
-                    .iter()
-                    .filter_map(|n| {
-                        captures
-                            .name(n)
-                            .map(|v| (n.to_string(), v.as_str().to_string()))
-                    })
-                    .collect();
                 // ...and spawn the trigger handler
                 let ctx = TriggerContext {
                     author,
-                    content,
-                    groups,
+                    captures,
                     db: self.db.clone(),
                     history: self.history.clone(),
                 };
