@@ -104,6 +104,7 @@ where
                 let sendmsg = self.sendmsg.clone();
                 let handler = handler.clone();
                 tokio::spawn(async move {
+                    #[allow(clippy::no_effect_underscore_binding)]
                     let _cancel = cancel;
                     let result = handler
                         .execute(ctx)
@@ -114,7 +115,7 @@ where
                 return;
             }
             // no handler found :c
-            let _ = (self.sendmsg)(origin, "Unknown command.".into());
+            let _res = (self.sendmsg)(origin, "Unknown command.".into());
             return;
         }
         // at this point we need to make the message owned
@@ -134,6 +135,7 @@ where
                 let sendmsg = self.sendmsg.clone();
                 let handler = handler.clone();
                 tokio::spawn(async move {
+                    #[allow(clippy::no_effect_underscore_binding)]
                     let _cancel = cancel;
                     let result = handler
                         .execute(ctx)
