@@ -83,10 +83,7 @@ impl Command for Search {
         } else {
             return Ok("Invalid usage.".into());
         };
-        let results = msg
-            .db
-            .search_quotes(msg.author.into(), query.into(), self.limit)
-            .await?;
+        let results = msg.db.search_quotes(msg.author, query, self.limit).await?;
         if results.is_empty() {
             return Ok("No results.".into());
         }
@@ -104,7 +101,7 @@ impl Command for Search {
 #[async_trait]
 impl Command for SearchNext {
     async fn execute(&self, msg: CommandContext) -> anyhow::Result<String> {
-        let results = if let Some(o) = msg.db.advance_search(msg.author.into(), self.limit).await? {
+        let results = if let Some(o) = msg.db.advance_search(msg.author, self.limit).await? {
             o
         } else {
             return Ok("You need to initiate a search first using 'qsearch'.".into());

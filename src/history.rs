@@ -28,7 +28,7 @@ impl MessageHistory {
             let count = len.min(count);
             Some(
                 deque
-                    .range(len-count..)
+                    .range(len - count..)
                     .map(ToString::to_string)
                     .collect(),
             )
@@ -40,7 +40,7 @@ impl MessageHistory {
     pub async fn edit_message(&self, user: &str, depth: usize, edited: String) -> bool {
         let mut map = self.map.write().await;
         if let Some(deque) = map.get_mut(user) {
-            if let Some(old) = deque.get_mut(deque.len()-1-depth) {
+            if let Some(old) = deque.get_mut(deque.len() - 1 - depth) {
                 *old = edited;
                 return true;
             }

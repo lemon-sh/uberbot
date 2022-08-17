@@ -37,8 +37,8 @@ mod commands;
 mod config;
 mod database;
 mod history;
-mod web;
 mod util;
+mod web;
 
 #[cfg(unix)]
 async fn terminate_signal() {

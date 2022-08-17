@@ -105,12 +105,7 @@ async fn play_eval_base(client: &Client, ctx: CommandContext, dbg: bool) -> anyh
 
     to_send = to_send.replace('\n', "\r\n");
 
-    let lines = to_send
-        .lines()
-        .flat_map(|s| StrChunks::new(s, 400))
-        .collect::<Vec<_>>();
-
-    if lines.len() > 10 {
+    if to_send.lines().flat_map(|s| StrChunks::new(s, 400)).count() > 10 {
         to_send = format!(
             "Output too large.\r\nPlayground link: {}",
             post_gist(client, &code).await?

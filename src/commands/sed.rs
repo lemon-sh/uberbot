@@ -1,6 +1,6 @@
+use crate::bot::{Trigger, TriggerContext};
 use async_trait::async_trait;
 use regex::RegexBuilder;
-use crate::bot::{Trigger, TriggerContext};
 
 pub struct Sed;
 
@@ -21,7 +21,8 @@ impl Trigger for Sed {
             return Ok("No previous messages found.".into());
         };
         if let (Some(find), Some(replace)) = (ctx.captures.name("r"), ctx.captures.name("w")) {
-            let (global, ignore_case) = ctx.captures
+            let (global, ignore_case) = ctx
+                .captures
                 .name("f")
                 .map(|s| (s.contains('g'), s.contains('i')))
                 .unwrap_or_default();

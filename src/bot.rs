@@ -1,11 +1,11 @@
 use crate::history::MessageHistory;
+use crate::util::{FancyRegexExt, OwnedCaptures};
 use crate::ExecutorConnection;
 use async_trait::async_trait;
 use fancy_regex::Regex;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use crate::util::{FancyRegexExt, OwnedCaptures};
 
 #[async_trait]
 pub trait Trigger {
@@ -74,11 +74,7 @@ where
         self.commands.insert(name, Arc::new(cmd));
     }
 
-    pub fn add_trigger<C: Trigger + Send + Sync + 'static>(
-        &mut self,
-        regex: Regex,
-        cmd: C,
-    ) {
+    pub fn add_trigger<C: Trigger + Send + Sync + 'static>(&mut self, regex: Regex, cmd: C) {
         self.triggers.push((regex, Arc::new(cmd)));
     }
 

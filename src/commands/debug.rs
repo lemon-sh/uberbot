@@ -1,6 +1,6 @@
-use std::time::Duration;
 use crate::bot::{Command, CommandContext};
 use async_trait::async_trait;
+use std::time::Duration;
 use tokio::time::sleep;
 
 pub struct LastMsg;
@@ -28,6 +28,6 @@ impl Command for Sleep {
             return Ok("Invalid usage.".to_string());
         };
         sleep(Duration::from_secs(duration)).await;
-        return Ok(format!("Slept {} seconds", duration))
+        return Ok(format!("Slept {} seconds", duration));
     }
 }

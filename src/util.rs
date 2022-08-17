@@ -25,21 +25,21 @@ pub trait FancyRegexExt {
 
 impl FancyRegexExt for fancy_regex::Regex {
     fn owned_captures(&self, text: &str) -> fancy_regex::Result<Option<OwnedCaptures>> {
-        let (named_groups, captures) = if let Some(c) = self.captures(&text)? {
+        let (named_groups, captures) = if let Some(c) = self.captures(text)? {
             let named_groups: HashMap<String, Range<_>> = self
                 .capture_names()
-                .filter_map(|v| v)
+                .flatten()
                 .filter_map(|g| c.name(g).map(|m| (g.to_string(), m.range())))
                 .collect();
-            let captures: Vec<Range<_>> = c.iter().filter_map(|v| v).map(|m| m.range()).collect();
+            let captures: Vec<Range<_>> = c.iter().flatten().map(|m| m.range()).collect();
             (named_groups, captures)
         } else {
-            return Ok(None)
+            return Ok(None);
         };
         Ok(Some(OwnedCaptures {
             text: text.to_string(),
             named_groups,
-            captures
+            captures,
         }))
     }
 }
