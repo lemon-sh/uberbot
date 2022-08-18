@@ -1,6 +1,6 @@
 [package]
 name = "uberbot"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 
 [profile.release]
@@ -14,7 +14,8 @@ tracing-subscriber = "0.3"
 reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
 serde_json = "1.0"
 fancy-regex = "0.10"
-rspotify = { version = "0.11", default-features = false, features = ["client-reqwest", "reqwest-rustls-tls"] }
+# change rspotify back to crates.io when https://github.com/ramsayleung/rspotify/pull/321 hits release code
+rspotify = { git = "https://github.com/ramsayleung/rspotify", default-features = false, features = ["client-reqwest", "reqwest-rustls-tls"] }
 htmlescape = "0.3"
 toml = "0.5"
 serde = { version = "1.0", features = ["derive"] }

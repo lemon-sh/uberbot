@@ -1,10 +1,47 @@
 use crate::history::MessageHistory;
+use crate::util::{FancyRegexExt, OwnedCaptures};
 use crate::ExecutorConnection;
 use async_trait::async_trait;
-use fancy_regex::{Captures, Regex};
+use fancy_regex::Regex;
 use std::collections::HashMap;
-use tokio::sync::{mpsc, Mutex};
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
+#[async_trait]
+pub trait Trigger {
+    async fn execute(&self, ctx: TriggerContext) -> anyhow::Result<String>;
+}
+
+#[async_trait]
+pub trait Command {
+    async fn execute(&self, ctx: CommandContext) -> anyhow::Result<String>;
+}
+
+pub struct CommandContext {
+    pub history: Arc<MessageHistory>,
+    pub author: String,
+    pub content: Option<String>,
+    pub db: ExecutorConnection,
+}
+
+pub struct TriggerContext {
+    pub history: Arc<MessageHistory>,
+    pub author: String,
+    // we can omit content because it's the same as captures.get(0).unwrap()
+    pub captures: OwnedCaptures,
+    pub db: ExecutorConnection,
+}
+
+pub struct Bot<SF: Fn(String, String) -> anyhow::Result<()>> {
+    history: Arc<MessageHistory>,
+    prefixes: Vec<String>,
+    db: ExecutorConnection,
+    commands: HashMap<String, Arc<dyn Command + Send + Sync>>,
+    triggers: Vec<(Regex, Arc<dyn Trigger + Send + Sync>)>,
+    sendmsg: Arc<SF>,
+}
+
+/// Extracts the command and argument (remainder) from the message
 fn dissect<'a>(prefixes: &[String], str: &'a str) -> Option<(&'a str, Option<&'a str>)> {
     for prefix in prefixes {
         if let Some(str) = str.strip_prefix(prefix) {
@@ -18,109 +55,99 @@ fn dissect<'a>(prefixes: &[String], str: &'a str) -> Option<(&'a str, Option<&'a
     None
 }
 
-#[async_trait]
-pub trait Trigger {
-    async fn execute<'a>(
-        &mut self,
-        msg: Context<'a>,
-        captures: Captures<'a>,
-    ) -> anyhow::Result<String>;
-}
-
-#[async_trait]
-pub trait Command {
-    async fn execute(&mut self, msg: Context<'_>) -> anyhow::Result<String>;
-}
-
-pub struct Context<'a> {
-    pub history: &'a MessageHistory,
-    pub author: &'a str,
-    // in case of triggers, this is always Some(...)
-    pub content: Option<&'a str>,
-    pub db: &'a ExecutorConnection,
-}
-
-pub struct Bot<SF: Fn(String, String) -> anyhow::Result<()>> {
-    history: MessageHistory,
-    prefixes: Vec<String>,
-    db: ExecutorConnection,
-    commands: HashMap<String, Box<Mutex<dyn Command + Send>>>,
-    triggers: Vec<(Regex, Box<Mutex<dyn Trigger + Send>>)>,
-    sendmsg: SF,
-}
-
-impl<SF: Fn(String, String) -> anyhow::Result<()>> Bot<SF> {
+impl<SF> Bot<SF>
+where
+    SF: Fn(String, String) -> anyhow::Result<()> + Send + Sync + 'static,
+{
     pub fn new(prefixes: Vec<String>, db: ExecutorConnection, hdepth: usize, sendmsg: SF) -> Self {
         Bot {
-            history: MessageHistory::new(hdepth),
+            history: Arc::new(MessageHistory::new(hdepth)),
             commands: HashMap::new(),
             triggers: Vec::new(),
             prefixes,
             db,
-            sendmsg,
+            sendmsg: Arc::new(sendmsg),
         }
     }
 
-    pub fn add_command<C: Command + Send + 'static>(&mut self, name: String, cmd: C) {
-        self.commands.insert(name, Box::new(Mutex::new(cmd)));
+    pub fn add_command<C: Command + Send + Sync + 'static>(&mut self, name: String, cmd: C) {
+        self.commands.insert(name, Arc::new(cmd));
     }
 
-    pub fn add_trigger<C: Trigger + Send + 'static>(&mut self, regex: Regex, cmd: C) {
-        self.triggers.push((regex, Box::new(Mutex::new(cmd))));
+    pub fn add_trigger<C: Trigger + Send + Sync + 'static>(&mut self, regex: Regex, cmd: C) {
+        self.triggers.push((regex, Arc::new(cmd)));
     }
 
-    async fn handle_message_inner(
-        &self,
-        origin: &str,
-        author: &str,
-        content: &str,
-    ) -> anyhow::Result<()> {
-        let content = content.trim();
-        if let Some((command, remainder)) = dissect(&self.prefixes, content) {
-            tracing::debug!("Got command: {:?} -> {:?}", command, remainder);
-            if command.is_empty() {
-                tracing::debug!("Empty command, skipping...");
-                return Ok(());
-            }
-            if let Some(handler) = self.commands.get(command) {
-                let msg = Context {
-                    author,
-                    content: remainder,
-                    db: &self.db,
-                    history: &self.history,
-                };
-                return (self.sendmsg)(origin.into(), handler.lock().await.execute(msg).await?);
-            }
-            return (self.sendmsg)(origin.into(), "Unknown command.".into());
-        }
-        for trigger in &self.triggers {
-            let captures = trigger.0.captures(content)?;
-            if let Some(captures) = captures {
-                let msg = Context {
-                    author,
-                    content: Some(content),
-                    db: &self.db,
-                    history: &self.history,
-                };
-                return (self.sendmsg)(
-                    origin.into(),
-                    trigger.1.lock().await.execute(msg, captures).await?,
-                );
-            }
-        }
-        self.history.add_message(author, content).await;
-        Ok(())
-    }
-
-    pub async fn handle_message(
+    pub(crate) async fn handle_message(
         &self,
         origin: String,
         author: String,
         content: String,
-        _cancel_handle: mpsc::Sender<()>,
+        cancel: mpsc::Sender<()>,
     ) {
-        if let Err(e) = self.handle_message_inner(&origin, &author, &content).await {
-            let _err = (self.sendmsg)(origin, format!("Error: {}", e));
+        let content = content.trim();
+        // first we check if the message is a command
+        if let Some((command, remainder)) = dissect(&self.prefixes, content) {
+            tracing::debug!("Got command: {:?} -> {:?}", command, remainder);
+            if command.is_empty() {
+                return;
+            }
+            // now we need to find a handler for this command
+            if let Some(handler) = self.commands.get(command) {
+                // we found a command, we can now spawn its handler
+                let ctx = CommandContext {
+                    author,
+                    content: remainder.map(ToString::to_string),
+                    db: self.db.clone(),
+                    history: self.history.clone(),
+                };
+                let sendmsg = self.sendmsg.clone();
+                let handler = handler.clone();
+                tokio::spawn(async move {
+                    #[allow(clippy::no_effect_underscore_binding)]
+                    let _cancel = cancel;
+                    let result = handler
+                        .execute(ctx)
+                        .await
+                        .unwrap_or_else(|e| format!("Error: {}", e));
+                    (sendmsg)(origin, result)
+                });
+                return;
+            }
+            // no handler found :c
+            let _res = (self.sendmsg)(origin, "Unknown command.".into());
+            return;
         }
+        // at this point we need to make the message owned
+        let content = content.to_string();
+        // the message is not a command, maybe it's a trigger?
+        for (trigger, handler) in &self.triggers {
+            let captures = trigger.owned_captures(&content).unwrap();
+            // we need to find a regex that matches this message
+            if let Some(captures) = captures {
+                // ...and spawn the trigger handler
+                let ctx = TriggerContext {
+                    author,
+                    captures,
+                    db: self.db.clone(),
+                    history: self.history.clone(),
+                };
+                let sendmsg = self.sendmsg.clone();
+                let handler = handler.clone();
+                tokio::spawn(async move {
+                    #[allow(clippy::no_effect_underscore_binding)]
+                    let _cancel = cancel;
+                    let result = handler
+                        .execute(ctx)
+                        .await
+                        .unwrap_or_else(|e| format!("Error: {}", e));
+                    (sendmsg)(origin, result)
+                });
+                return;
+            }
+        }
+        // no regex matched the message, so it's neither a command nor a trigger
+        // it's a regular message, so we add it to the message history
+        self.history.add_message(&author, content).await;
     }
 }

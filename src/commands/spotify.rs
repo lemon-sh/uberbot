@@ -1,8 +1,7 @@
-use crate::bot::{Context, Trigger};
+use crate::bot::{Trigger, TriggerContext};
 use async_trait::async_trait;
-use fancy_regex::Captures;
 use rspotify::clients::BaseClient;
-use rspotify::model::{Id, PlayableItem};
+use rspotify::model::{AlbumId, ArtistId, PlayableItem, PlaylistId, TrackId};
 use rspotify::{ClientCredsSpotify, Credentials};
 
 pub struct Spotify {
@@ -11,7 +10,7 @@ pub struct Spotify {
 
 impl Spotify {
     pub async fn new(creds: Credentials) -> anyhow::Result<Self> {
-        let mut spotify = ClientCredsSpotify::new(creds);
+        let spotify = ClientCredsSpotify::new(creds);
         spotify.request_token().await?;
         Ok(Self { spotify })
     }
@@ -19,19 +18,10 @@ impl Spotify {
 
 #[async_trait]
 impl Trigger for Spotify {
-    async fn execute<'a>(
-        &mut self,
-        msg: Context<'a>,
-        captures: Captures<'a>,
-    ) -> anyhow::Result<String> {
-        let tp_group = captures.get(1).unwrap();
-        let id_group = captures.get(2).unwrap();
-        resolve_spotify(
-            &mut self.spotify,
-            &msg.content.unwrap()[tp_group.start()..tp_group.end()],
-            &msg.content.unwrap()[id_group.start()..id_group.end()],
-        )
-        .await
+    async fn execute(&self, ctx: TriggerContext) -> anyhow::Result<String> {
+        let tp = ctx.captures.get(1).unwrap();
+        let id = ctx.captures.get(2).unwrap();
+        resolve_spotify(&self.spotify, tp, id).await
     }
 }
 
@@ -43,7 +33,7 @@ fn calculate_playtime(secs: u64) -> (u64, u64) {
 }
 
 async fn resolve_spotify(
-    spotify: &mut ClientCredsSpotify,
+    spotify: &ClientCredsSpotify,
     resource_type: &str,
     resource_id: &str,
 ) -> anyhow::Result<String> {
@@ -65,13 +55,13 @@ async fn resolve_spotify(
     );
     match resource_type {
         "track" => {
-            let track = spotify.track(&Id::from_id(resource_id)?).await?;
+            let track = spotify.track(TrackId::from_id(resource_id)?).await?;
             let playtime = calculate_playtime(track.duration.as_secs());
             let artists: Vec<String> = track.artists.into_iter().map(|x| x.name).collect();
             Ok(format!("\x037[Spotify]\x03 Track: \x039\"{}\"\x03 - \x039\"{}\" \x0311|\x03 Album: \x039\"{}\" \x0311|\x03 Length:\x0315 {}:{:02} \x0311|", artists.join(", "), track.name, track.album.name, playtime.0, playtime.1))
         }
         "artist" => {
-            let artist = spotify.artist(&Id::from_id(resource_id)?).await?;
+            let artist = spotify.artist(ArtistId::from_id(resource_id)?).await?;
             Ok(format!(
                 "\x037[Spotify]\x03 Artist: \x039\"{}\" \x0311|\x03 Genres:\x039 {} \x0311|",
                 artist.name,
@@ -79,7 +69,7 @@ async fn resolve_spotify(
             ))
         }
         "album" => {
-            let album = spotify.album(&Id::from_id(resource_id)?).await?;
+            let album = spotify.album(AlbumId::from_id(resource_id)?).await?;
             let playtime = calculate_playtime(
                 album
                     .tracks
@@ -91,7 +81,7 @@ async fn resolve_spotify(
         }
         "playlist" => {
             let playlist = spotify
-                .playlist(&Id::from_id(resource_id)?, None, None)
+                .playlist(PlaylistId::from_id(resource_id)?, None, None)
                 .await?;
             let mut tracks = 0;
             let playtime = calculate_playtime(playlist.tracks.items.iter().fold(0, |acc, x| {

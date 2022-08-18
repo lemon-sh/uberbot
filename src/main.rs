@@ -11,6 +11,8 @@ use crate::bot::Bot;
 use crate::commands::eval::Eval;
 use crate::commands::help::Help;
 use crate::commands::leek::{Leet, Mock, Owo};
+use crate::commands::playground::Dbg;
+use crate::commands::playground::Play;
 use crate::commands::quotes::{Grab, Quot, Search, SearchNext};
 use crate::commands::sed::Sed;
 use crate::commands::spotify::Spotify;
@@ -35,6 +37,7 @@ mod commands;
 mod config;
 mod database;
 mod history;
+mod util;
 mod web;
 
 #[cfg(unix)]
@@ -136,6 +139,8 @@ async fn main() -> anyhow::Result<()> {
     let search_limit = cfg.bot.search_limit.unwrap_or(3);
     bot.add_command("qsearch".into(), Search::new(search_limit));
     bot.add_command("qnext".into(), SearchNext::new(search_limit));
+    bot.add_command("play".into(), Play::default());
+    bot.add_command("dbg".into(), Dbg::default());
     bot.add_trigger(
         Regex::new(r"^(?:(?<u>\S+):\s+)?s/(?<r>[^/]*)/(?<w>[^/]*)(?:/(?<f>[a-z]*))?\s*")?,
         Sed,
@@ -147,11 +152,12 @@ async fn main() -> anyhow::Result<()> {
     } else {
         tracing::warn!("Spotify module is disabled, because the config is missing");
     }
-    bot.add_trigger(Regex::new(r"https?://[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b[-a-zA-Z0-9()@:%_\+.~#?&//=]*")?, Title::new()?);
+    bot.add_trigger(Regex::new(r"https?://[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b[-a-zA-Z0-9()@:%_+.~#?&/=]*")?, Title::new()?);
     #[cfg(feature = "debug")]
     {
         use commands::debug::*;
         bot.add_command("lastmsg".into(), LastMsg);
+        bot.add_command("sleep".into(), Sleep)
     }
 
     let message_loop_task = tokio::spawn(async move {
@@ -193,7 +199,6 @@ async fn message_loop<SF>(mut stream: ClientStream, bot: Bot<SF>) -> anyhow::Res
 where
     SF: Fn(String, String) -> anyhow::Result<()> + Send + Sync + 'static,
 {
-    let bot = Arc::new(bot);
     let (cancelled_send, mut cancelled_recv) = mpsc::channel::<()>(1);
     while let Some(message) = stream.next().await.transpose()? {
         if let Command::PRIVMSG(origin, content) = message.command {
@@ -202,12 +207,9 @@ where
                     Prefix::Nickname(name, _, _) => Some(name),
                     Prefix::ServerName(_) => None,
                 }) {
-                    let bot = bot.clone();
                     let cancelled_send = cancelled_send.clone();
-                    tokio::spawn(async move {
-                        bot.handle_message(origin, author, content, cancelled_send)
-                            .await;
-                    });
+                    bot.handle_message(origin, author, content, cancelled_send)
+                        .await;
                 } else {
                     tracing::warn!("Couldn't get the author for a message");
                 }

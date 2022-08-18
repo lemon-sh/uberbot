@@ -40,7 +40,7 @@ where
             .status(StatusCode::BAD_REQUEST)
             .body(Body::from("no content-type"))?);
     }
-    let webhook = (&req.uri().path()[1..]).to_string();
+    let webhook = (req.uri().path()[1..]).to_string();
     let channel = if let Some(c) = ctx.cfg.webhooks.get(&webhook) {
         c
     } else {
