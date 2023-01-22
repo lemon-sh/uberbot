@@ -1,11 +1,13 @@
 use rusqlite::{params, OptionalExtension, Params};
 use serde::Serialize;
 use std::collections::HashMap;
-use tokio::sync::{
-    mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
-    oneshot,
+use tokio::{
+    sync::{
+        mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
+        oneshot,
+    },
+    time::Instant,
 };
-use tokio::time::Instant;
 
 #[derive(Debug)]
 enum Task {

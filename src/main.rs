@@ -2,33 +2,38 @@
 #![allow(clippy::module_name_repetitions, clippy::too_many_lines)]
 
 use fancy_regex::Regex;
-use std::str::FromStr;
-use std::sync::Arc;
-use std::{env, fs};
-use std::{process, thread};
+use std::{env, fs, process, str::FromStr, sync::Arc, thread};
 
-use crate::bot::Bot;
-use crate::commands::eval::Eval;
-use crate::commands::help::Help;
-use crate::commands::leek::{Leet, Mock, Owo};
-use crate::commands::quotes::{Grab, Quot, Search, SearchNext};
-use crate::commands::sed::Sed;
-use crate::commands::spotify::Spotify;
-use crate::commands::title::Title;
-use crate::commands::waifu::Waifu;
-use crate::web::HttpContext;
+use crate::{
+    bot::Bot,
+    commands::{
+        eval::Eval,
+        help::Help,
+        leek::{Leet, Mock, Owo},
+        quotes::{Grab, Quot, Search, SearchNext},
+        sed::Sed,
+        spotify::Spotify,
+        title::Title,
+        waifu::Waifu,
+    },
+    web::HttpContext,
+};
 use futures_util::stream::StreamExt;
-use irc::client::prelude::Config;
-use irc::client::{Client, ClientStream};
-use irc::proto::{ChannelExt, Command, Prefix};
+use irc::{
+    client::{prelude::Config, Client, ClientStream},
+    proto::{ChannelExt, Command, Prefix},
+};
 use rspotify::Credentials;
-use tokio::select;
-use tokio::sync::mpsc::unbounded_channel;
-use tokio::sync::{broadcast, mpsc};
+use tokio::{
+    select,
+    sync::{broadcast, mpsc, mpsc::unbounded_channel},
+};
 use tracing::Level;
 
-use crate::config::UberConfig;
-use crate::database::{DbExecutor, ExecutorConnection};
+use crate::{
+    config::UberConfig,
+    database::{DbExecutor, ExecutorConnection},
+};
 
 mod bot;
 mod commands;

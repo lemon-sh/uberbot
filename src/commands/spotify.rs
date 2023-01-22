@@ -1,8 +1,10 @@
 use crate::bot::{Trigger, TriggerContext};
 use async_trait::async_trait;
-use rspotify::clients::BaseClient;
-use rspotify::model::{AlbumId, ArtistId, PlayableItem, PlaylistId, TrackId};
-use rspotify::{ClientCredsSpotify, Credentials};
+use rspotify::{
+    clients::BaseClient,
+    model::{AlbumId, ArtistId, PlayableItem, PlaylistId, TrackId},
+    ClientCredsSpotify, Credentials,
+};
 
 pub struct Spotify {
     spotify: ClientCredsSpotify,

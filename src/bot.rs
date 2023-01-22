@@ -1,10 +1,11 @@
-use crate::history::MessageHistory;
-use crate::util::{FancyRegexExt, OwnedCaptures};
-use crate::ExecutorConnection;
+use crate::{
+    history::MessageHistory,
+    util::{FancyRegexExt, OwnedCaptures},
+    ExecutorConnection,
+};
 use async_trait::async_trait;
 use fancy_regex::Regex;
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc;
 
 #[async_trait]

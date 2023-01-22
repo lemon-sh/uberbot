@@ -1,5 +1,7 @@
-use crate::bot::{Command, CommandContext};
-use crate::database::Quote;
+use crate::{
+    bot::{Command, CommandContext},
+    database::Quote,
+};
 use async_trait::async_trait;
 use std::fmt::Write;
 
