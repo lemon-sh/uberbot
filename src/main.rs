@@ -11,8 +11,6 @@ use crate::bot::Bot;
 use crate::commands::eval::Eval;
 use crate::commands::help::Help;
 use crate::commands::leek::{Leet, Mock, Owo};
-use crate::commands::playground::Dbg;
-use crate::commands::playground::Play;
 use crate::commands::quotes::{Grab, Quot, Search, SearchNext};
 use crate::commands::sed::Sed;
 use crate::commands::spotify::Spotify;
@@ -139,8 +137,6 @@ async fn main() -> anyhow::Result<()> {
     let search_limit = cfg.bot.search_limit.unwrap_or(3);
     bot.add_command("qsearch".into(), Search::new(search_limit));
     bot.add_command("qnext".into(), SearchNext::new(search_limit));
-    bot.add_command("play".into(), Play::default());
-    bot.add_command("dbg".into(), Dbg::default());
     bot.add_trigger(
         Regex::new(r"^(?:(?<u>\S+):\s+)?s/(?<r>[^/]*)/(?<w>[^/]*)(?:/(?<f>[a-z]*))?\s*")?,
         Sed,
