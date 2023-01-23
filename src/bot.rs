@@ -1,6 +1,6 @@
 use crate::{
     history::MessageHistory,
-    util::{FancyRegexExt, OwnedCaptures},
+    regex_util::{FancyRegexExt, OwnedCaptures},
     ExecutorConnection,
 };
 use async_trait::async_trait;
@@ -33,12 +33,18 @@ pub struct TriggerContext {
     pub db: ExecutorConnection,
 }
 
+pub struct TriggerEntry {
+    name: String,
+    regex: Regex,
+    handler: Arc<dyn Trigger + Send + Sync>
+}
+
 pub struct Bot<SF: Fn(String, String) -> anyhow::Result<()>> {
     history: Arc<MessageHistory>,
     prefixes: Vec<String>,
     db: ExecutorConnection,
     commands: HashMap<String, Arc<dyn Command + Send + Sync>>,
-    triggers: Vec<(Regex, Arc<dyn Trigger + Send + Sync>)>,
+    triggers: Vec<TriggerEntry>,
     sendmsg: Arc<SF>,
 }
 
@@ -75,8 +81,8 @@ where
         self.commands.insert(name, Arc::new(cmd));
     }
 
-    pub fn add_trigger<C: Trigger + Send + Sync + 'static>(&mut self, regex: Regex, cmd: C) {
-        self.triggers.push((regex, Arc::new(cmd)));
+    pub fn add_trigger<C: Trigger + Send + Sync + 'static>(&mut self, name: String, regex: Regex, trig: C) {
+        self.triggers.push(TriggerEntry { name, regex, handler: Arc::new(trig) });
     }
 
     pub(crate) async fn handle_message(
@@ -122,8 +128,8 @@ where
         // at this point we need to make the message owned
         let content = content.to_string();
         // the message is not a command, maybe it's a trigger?
-        for (trigger, handler) in &self.triggers {
-            let captures = trigger.owned_captures(&content).unwrap();
+        for trigger in &self.triggers {
+            let captures = trigger.regex.owned_captures(&content).unwrap();
             // we need to find a regex that matches this message
             if let Some(captures) = captures {
                 // ...and spawn the trigger handler
@@ -134,7 +140,7 @@ where
                     history: self.history.clone(),
                 };
                 let sendmsg = self.sendmsg.clone();
-                let handler = handler.clone();
+                let handler = trigger.handler.clone();
                 tokio::spawn(async move {
                     #[allow(clippy::no_effect_underscore_binding)]
                     let _cancel = cancel;

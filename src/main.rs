@@ -40,7 +40,7 @@ mod commands;
 mod config;
 mod database;
 mod history;
-mod util;
+mod regex_util;
 mod web;
 
 #[cfg(unix)]
@@ -143,17 +143,18 @@ async fn main() -> anyhow::Result<()> {
     bot.add_command("qsearch".into(), Search::new(search_limit));
     bot.add_command("qnext".into(), SearchNext::new(search_limit));
     bot.add_trigger(
+        "sed".into(),
         Regex::new(r"^(?:(?<u>\S+):\s+)?s/(?<r>[^/]*)/(?<w>[^/]*)(?:/(?<f>[a-z]*))?\s*")?,
         Sed,
     );
     if let Some(spotcfg) = cfg.spotify {
         let creds = Credentials::new(&spotcfg.client_id, &spotcfg.client_secret);
         let spotify = Spotify::new(creds).await?;
-        bot.add_trigger(Regex::new(r"(?:https?|spotify):(?://open\.spotify\.com/)?(track|artist|album|playlist)[/:]([a-zA-Z\d]*)")?, spotify);
+        bot.add_trigger("spotify".into(), Regex::new(r"(?:https?|spotify):(?://open\.spotify\.com/)?(track|artist|album|playlist)[/:]([a-zA-Z\d]*)")?, spotify);
     } else {
         tracing::warn!("Spotify module is disabled, because the config is missing");
     }
-    bot.add_trigger(Regex::new(r"https?://[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b[-a-zA-Z0-9()@:%_+.~#?&/=]*")?, Title::new()?);
+    bot.add_trigger("title".into(), Regex::new(r"https?://[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b[-a-zA-Z0-9()@:%_+.~#?&/=]*")?, Title::new()?);
     #[cfg(feature = "debug")]
     {
         use commands::debug::*;
