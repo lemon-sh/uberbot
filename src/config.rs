@@ -1,4 +1,4 @@
-use std::{collections::{HashMap}, net::SocketAddr};
+use std::{collections::HashMap, net::SocketAddr};
 
 use serde::Deserialize;
 
@@ -26,6 +26,7 @@ pub struct IrcConfig {
     pub nickname: Option<String>,
     pub port: u16,
     pub username: String,
+    pub sasl_pass: Option<String>,
 }
 
 #[derive(Deserialize)]

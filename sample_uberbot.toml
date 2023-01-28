@@ -8,6 +8,7 @@ username = "uberbot"
 nickname = "amazingbot"  # optional, default: same as username
 channels = ["#main", "#no-normies"]
 mode = "+B"  # optional, default: none
+sasl_pass = "1234"  # optional, does not attempt SASL PLAIN authentication by default 
 
 [bot]
 db_path = "database.db3"  # optional, default: uberbot.db3

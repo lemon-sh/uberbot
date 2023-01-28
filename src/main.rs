@@ -21,7 +21,7 @@ use crate::{
 use futures_util::stream::StreamExt;
 use irc::{
     client::{prelude::Config, Client, ClientStream},
-    proto::{ChannelExt, Command, Prefix},
+    proto::{Capability, ChannelExt, Command, Prefix},
 };
 use rspotify::Credentials;
 use tokio::{
@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
     let irc_config = Config {
         nickname: Some(cfg.irc.nickname.unwrap_or_else(|| cfg.irc.username.clone())),
         username: Some(cfg.irc.username.clone()),
-        realname: Some(cfg.irc.username),
+        realname: Some(cfg.irc.username.clone()),
         server: Some(cfg.irc.host),
         port: Some(cfg.irc.port),
         use_tls: Some(cfg.irc.tls),
@@ -106,7 +106,32 @@ async fn main() -> anyhow::Result<()> {
     };
     let mut client = Client::from_config(irc_config).await?;
     let stream = client.stream()?;
-    client.identify()?;
+    
+    if let Some(pass) = cfg.irc.sasl_pass {
+        let sasl_pass = base64::encode(format!(
+            "{}\0{}\0{}",
+            &cfg.irc.username, &cfg.irc.username, pass
+        ));
+
+        client.send_cap_req(&[Capability::Sasl])?;
+        client.send(Command::NICK(client.current_nickname().into()))?;
+        client.send(Command::USER(
+            cfg.irc.username.clone(),
+            "0".into(),
+            cfg.irc.username.clone(),
+        ))?;
+        client.send_sasl_plain()?;
+        client.send_sasl(sasl_pass)?;
+        client.send(Command::CAP(
+            None,
+            irc::proto::CapSubCommand::END,
+            None,
+            None,
+        ))?;
+    } else {
+        client.identify()?;
+    }
+
     let client = Arc::new(client);
 
     let (ctx, _) = broadcast::channel(1);
