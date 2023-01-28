@@ -45,6 +45,7 @@ pub struct Bot<SF: Fn(String, String) -> anyhow::Result<()>> {
     db: ExecutorConnection,
     commands: HashMap<String, Arc<dyn Command + Send + Sync>>,
     triggers: Vec<TriggerEntry>,
+    ignored_triggers: Option<HashMap<String, Vec<String>>>,
     sendmsg: Arc<SF>,
 }
 
@@ -66,7 +67,7 @@ impl<SF> Bot<SF>
 where
     SF: Fn(String, String) -> anyhow::Result<()> + Send + Sync + 'static,
 {
-    pub fn new(prefixes: Vec<String>, db: ExecutorConnection, hdepth: usize, sendmsg: SF) -> Self {
+    pub fn new(prefixes: Vec<String>, db: ExecutorConnection, hdepth: usize, sendmsg: SF, ignored_triggers: Option<HashMap<String, Vec<String>>>) -> Self {
         Bot {
             history: Arc::new(MessageHistory::new(hdepth)),
             commands: HashMap::new(),
@@ -74,6 +75,7 @@ where
             prefixes,
             db,
             sendmsg: Arc::new(sendmsg),
+            ignored_triggers,
         }
     }
 
@@ -82,6 +84,12 @@ where
     }
 
     pub fn add_trigger<C: Trigger + Send + Sync + 'static>(&mut self, name: String, regex: Regex, trig: C) {
+        if let Some(ign) = self.ignored_triggers.as_ref().and_then(|v| v.get(&name)) {
+            if ign.iter().any(|v| *v == name) {
+                tracing::debug!("Not installing trigger {}, because it's globally ignored", name);
+                return;
+            }
+        }
         self.triggers.push(TriggerEntry { name, regex, handler: Arc::new(trig) });
     }
 
@@ -132,7 +140,14 @@ where
             let captures = trigger.regex.owned_captures(&content).unwrap();
             // we need to find a regex that matches this message
             if let Some(captures) = captures {
-                // ...and spawn the trigger handler
+                // check if it's not ignored
+                if let Some(ign) = self.ignored_triggers.as_ref().and_then(|v| v.get(&trigger.name)) {
+                    if ign.contains(&origin) {
+                        tracing::debug!("Skipping ignored trigger {} for channel {}", trigger.name, origin);
+                        break;
+                    }
+                }
+                // and spawn the trigger handler
                 let ctx = TriggerContext {
                     author,
                     captures,

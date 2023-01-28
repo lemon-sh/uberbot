@@ -129,7 +129,7 @@ async fn main() -> anyhow::Result<()> {
             }
         })
     });
-    let mut bot = Bot::new(cfg.bot.prefixes, db_conn, cfg.bot.history_depth, sf);
+    let mut bot = Bot::new(cfg.bot.prefixes, db_conn, cfg.bot.history_depth, sf, cfg.bot.ignored_triggers);
 
     bot.add_command("help".into(), Help);
     bot.add_command("waifu".into(), Waifu::default());
