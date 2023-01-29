@@ -35,7 +35,7 @@ pub struct BotConfig {
     pub history_depth: usize,
     pub search_limit: Option<usize>,
     pub prefixes: Vec<String>,
-    pub ignored_triggers: Option<HashMap<String, Vec<String>>>
+    pub ignored_triggers: Option<HashMap<String, Vec<String>>>,
 }
 
 #[derive(Deserialize)]

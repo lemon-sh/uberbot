@@ -106,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
     };
     let mut client = Client::from_config(irc_config).await?;
     let stream = client.stream()?;
-    
+
     if let Some(pass) = cfg.irc.sasl_pass {
         let sasl_pass = base64::encode(format!(
             "{}\0{}\0{}",
@@ -154,7 +154,13 @@ async fn main() -> anyhow::Result<()> {
             }
         })
     });
-    let mut bot = Bot::new(cfg.bot.prefixes, db_conn, cfg.bot.history_depth, sf, cfg.bot.ignored_triggers);
+    let mut bot = Bot::new(
+        cfg.bot.prefixes,
+        db_conn,
+        cfg.bot.history_depth,
+        sf,
+        cfg.bot.ignored_triggers,
+    );
 
     bot.add_command("help".into(), Help);
     bot.add_command("waifu".into(), Waifu::default());

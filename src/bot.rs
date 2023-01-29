@@ -36,7 +36,7 @@ pub struct TriggerContext {
 pub struct TriggerEntry {
     name: String,
     regex: Regex,
-    handler: Arc<dyn Trigger + Send + Sync>
+    handler: Arc<dyn Trigger + Send + Sync>,
 }
 
 pub struct Bot<SF: Fn(String, String) -> anyhow::Result<()>> {
@@ -67,7 +67,13 @@ impl<SF> Bot<SF>
 where
     SF: Fn(String, String) -> anyhow::Result<()> + Send + Sync + 'static,
 {
-    pub fn new(prefixes: Vec<String>, db: ExecutorConnection, hdepth: usize, sendmsg: SF, ignored_triggers: Option<HashMap<String, Vec<String>>>) -> Self {
+    pub fn new(
+        prefixes: Vec<String>,
+        db: ExecutorConnection,
+        hdepth: usize,
+        sendmsg: SF,
+        ignored_triggers: Option<HashMap<String, Vec<String>>>,
+    ) -> Self {
         Bot {
             history: Arc::new(MessageHistory::new(hdepth)),
             commands: HashMap::new(),
@@ -83,14 +89,26 @@ where
         self.commands.insert(name, Arc::new(cmd));
     }
 
-    pub fn add_trigger<C: Trigger + Send + Sync + 'static>(&mut self, name: String, regex: Regex, trig: C) {
+    pub fn add_trigger<C: Trigger + Send + Sync + 'static>(
+        &mut self,
+        name: String,
+        regex: Regex,
+        trig: C,
+    ) {
         if let Some(ign) = self.ignored_triggers.as_ref().and_then(|v| v.get(&name)) {
             if ign.iter().any(|v| *v == name) {
-                tracing::debug!("Not installing trigger {}, because it's globally ignored", name);
+                tracing::debug!(
+                    "Not installing trigger {}, because it's globally ignored",
+                    name
+                );
                 return;
             }
         }
-        self.triggers.push(TriggerEntry { name, regex, handler: Arc::new(trig) });
+        self.triggers.push(TriggerEntry {
+            name,
+            regex,
+            handler: Arc::new(trig),
+        });
     }
 
     pub(crate) async fn handle_message(
@@ -141,9 +159,17 @@ where
             // we need to find a regex that matches this message
             if let Some(captures) = captures {
                 // check if it's not ignored
-                if let Some(ign) = self.ignored_triggers.as_ref().and_then(|v| v.get(&trigger.name)) {
+                if let Some(ign) = self
+                    .ignored_triggers
+                    .as_ref()
+                    .and_then(|v| v.get(&trigger.name))
+                {
                     if ign.contains(&origin) {
-                        tracing::debug!("Skipping ignored trigger {} for channel {}", trigger.name, origin);
+                        tracing::debug!(
+                            "Skipping ignored trigger {} for channel {}",
+                            trigger.name,
+                            origin
+                        );
                         break;
                     }
                 }
