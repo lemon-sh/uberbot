@@ -67,7 +67,7 @@ async fn terminate_signal() {
 async fn main() -> anyhow::Result<()> {
     let config_var = env::var("UBERBOT_CONFIG");
     let config_path = config_var.as_deref().unwrap_or("uberbot.toml");
-    println!("Loading config from '{}'...", config_path);
+    println!("Loading config from '{config_path}'...");
     let config_str = fs::read_to_string(config_path)?;
     let cfg: UberConfig = toml::from_str(&config_str)?;
 

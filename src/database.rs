@@ -115,11 +115,7 @@ impl DbExecutor {
         user: &str,
         limit: usize,
     ) -> rusqlite::Result<Option<Vec<Quote>>> {
-        let (query, old_oid) = if let Some(o) = searches.get_mut(user) {
-            o
-        } else {
-            return Ok(None);
-        };
+        let Some((query, old_oid)) = searches.get_mut(user) else { return Ok(None); };
         let (quotes, new_oid) = self.yield_quotes_oid("select oid,quote,username from quotes where oid > ? and quote match ? order by oid asc limit ?", params![*old_oid, &*query, limit])?;
         if new_oid != -1 {
             *old_oid = new_oid;

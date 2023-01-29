@@ -41,9 +41,7 @@ where
             .body(Body::from("no content-type"))?);
     }
     let webhook = (req.uri().path()[1..]).to_string();
-    let channel = if let Some(c) = ctx.cfg.webhooks.get(&webhook) {
-        c
-    } else {
+    let Some(channel) = ctx.cfg.webhooks.get(&webhook) else {
         return Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(Body::from("webhook path not registered"))?);

@@ -124,7 +124,7 @@ where
                     let result = handler
                         .execute(ctx)
                         .await
-                        .unwrap_or_else(|e| format!("Error: {}", e));
+                        .unwrap_or_else(|e| format!("Error: {e}"));
                     (sendmsg)(origin, result)
                 });
                 return;
@@ -162,7 +162,7 @@ where
                     let result = handler
                         .execute(ctx)
                         .await
-                        .unwrap_or_else(|e| format!("Error: {}", e));
+                        .unwrap_or_else(|e| format!("Error: {e}"));
                     (sendmsg)(origin, result)
                 });
                 return;

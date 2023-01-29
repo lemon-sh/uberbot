@@ -14,7 +14,7 @@ impl Command for Waifu {
         let category = msg.content.as_deref().unwrap_or("waifu");
         let request = self
             .http
-            .get(format!("https://api.waifu.pics/sfw/{}", category))
+            .get(format!("https://api.waifu.pics/sfw/{category}"))
             .build()?;
         let response = self.http.execute(request).await?.text().await?;
         let response = response.trim();

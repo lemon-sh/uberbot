@@ -31,11 +31,7 @@ impl SearchNext {
 #[async_trait]
 impl Command for Grab {
     async fn execute(&self, msg: CommandContext) -> anyhow::Result<String> {
-        let content = if let Some(c) = msg.content {
-            c
-        } else {
-            return Ok("Invalid usage.".into());
-        };
+        let Some(content) = msg.content else { return Ok("Invalid usage.".into()); };
         let mut split = content.splitn(2, ' ');
         let split = (split.next().unwrap(), split.next());
         let (author, count) = if let Some(author) = split.1 {
@@ -80,11 +76,7 @@ impl Command for Quot {
 #[async_trait]
 impl Command for Search {
     async fn execute(&self, msg: CommandContext) -> anyhow::Result<String> {
-        let query = if let Some(c) = msg.content {
-            c
-        } else {
-            return Ok("Invalid usage.".into());
-        };
+        let Some(query) = msg.content else { return Ok("Invalid usage.".into()); };
         let results = msg.db.search_quotes(msg.author, query, self.limit).await?;
         if results.is_empty() {
             return Ok("No results.".into());
@@ -103,9 +95,7 @@ impl Command for Search {
 #[async_trait]
 impl Command for SearchNext {
     async fn execute(&self, msg: CommandContext) -> anyhow::Result<String> {
-        let results = if let Some(o) = msg.db.advance_search(msg.author, self.limit).await? {
-            o
-        } else {
+        let Some(results) = msg.db.advance_search(msg.author, self.limit).await? else {
             return Ok("You need to initiate a search first using 'qsearch'.".into());
         };
         if results.is_empty() {

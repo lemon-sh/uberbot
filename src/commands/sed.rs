@@ -15,9 +15,7 @@ impl Trigger for Sed {
             foreign_author = false;
             &ctx.author
         };
-        let message = if let Some(msg) = ctx.history.last_msg(author).await {
-            msg
-        } else {
+        let Some(message) = ctx.history.last_msg(author).await else {
             return Ok("No previous messages found.".into());
         };
         if let (Some(find), Some(replace)) = (ctx.captures.name("r"), ctx.captures.name("w")) {
@@ -44,7 +42,7 @@ impl Trigger for Sed {
                 ctx.history
                     .edit_message(author, 0, result.to_string())
                     .await;
-                Ok(format!("<{}> {}", author, result))
+                Ok(format!("<{author}> {result}"))
             }
         } else {
             Ok("Invalid usage.".into())
