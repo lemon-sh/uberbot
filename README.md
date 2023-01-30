@@ -2,23 +2,22 @@
 An IRC bot Above All [other bots].
 
 ## Features
-- SED expressions
+- sed expressions
+- math expressions
 - Leek, fun commands for manipulating text:
     - mock, mock a message made by someone lIkE tHiS
     - leet, coverts specific chars to the number which looks similar, for example C4761rls
-    - owo, self explanatory
-- Quoting
+    - owo, owofies the text
+- Quoting messages
 - Fetching pictures from [waifu.pics](https://waifu.pics)
 - Title of links sent in a channel, currently supports:
-  - HTTP webpages
-  - Spotify
-- Rust evaluation using the rust playground
+  - HTML webpages (`<title>` tag)
+  - Spotify (track metadata - artist, duration, etc.)
 
 ## Setup
+
 ### Compiling the binary
-To compile the binary, you will first need to have the following installed:
-- git
-- A rust toolchain
+You should have the latest Rust toolchain installed.
 
 Clone the source code:
 
@@ -30,9 +29,12 @@ Compile the source code:
 
 After the compiling has finished, you can find the binary under `target/release/uberbot`
 
+#### MSRV
+The MSRV (Minimum Supported Rust Version) for überbot is currently **1.67**.
+
 ### Configuration
 
-Uberbot uses the environment variable `UBERBOT_CONFIG`, if it is not set
+überbot uses the environment variable `UBERBOT_CONFIG`, if it is not set
 it will look for `uberbot.toml` in the working directory.
 
 An example configuration can be found in `sample_uberbot.toml`
