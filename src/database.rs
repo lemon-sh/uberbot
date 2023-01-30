@@ -158,6 +158,8 @@ impl Clone for ExecutorConnection {
     }
 }
 
+// TODO: this is ugly, write a macro that will generate
+//       both the Task enum and the ExecutorConnection impl.
 macro_rules! executor_wrapper {
     ($name:ident, $task:expr, $ret:ty, $($arg:ident: $ty:ty),*) => {
         pub async fn $name(&self, $($arg: $ty),*) -> $ret {
