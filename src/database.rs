@@ -9,24 +9,35 @@ use tokio::{
     time::Instant,
 };
 
-#[derive(Debug)]
-enum Task {
-    AddQuote(oneshot::Sender<rusqlite::Result<()>>, Quote),
-    GetQuote(
-        oneshot::Sender<rusqlite::Result<Option<Quote>>>,
-        Option<String>,
-    ),
-    StartSearch(
-        oneshot::Sender<rusqlite::Result<Vec<Quote>>>,
-        String,
-        String,
-        usize,
-    ),
-    NextSearch(
-        oneshot::Sender<rusqlite::Result<Option<Vec<Quote>>>>,
-        String,
-        usize,
-    ),
+pub struct ExecutorConnection(UnboundedSender<Task>);
+impl Clone for ExecutorConnection {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+macro_rules! executor_wrapper {
+    ($($task:ident / $fn:ident, ($($arg:ident: $ty:ty),*) => $ret:ty)*) => {
+        #[derive(Debug)]
+        enum Task {
+            $($task{tx:oneshot::Sender<$ret>,$($arg:$ty,)*}),*
+        }
+
+        impl ExecutorConnection {
+            $(pub async fn $fn(&self, $($arg: $ty),*) -> $ret {
+                let (tx, rx) = oneshot::channel();
+                self.0.send(Task::$task{tx,$($arg),*}).unwrap();
+                rx.await.unwrap()
+            })*
+        }
+    };
+}
+
+executor_wrapper! {
+    AddQuote / add_quote, (quote: Quote) => rusqlite::Result<()>
+    GetQuote / get_quote, (author: Option<String>) => rusqlite::Result<Option<Quote>>
+    StartSearch / search_quotes, (user: String, query: String, limit: usize) => rusqlite::Result<Vec<Quote>>
+    NextSearch / advance_search, (user: String, limit: usize) => rusqlite::Result<Option<Vec<Quote>>>
 }
 
 pub struct DbExecutor {
@@ -49,7 +60,7 @@ impl DbExecutor {
             [],
         )?;
         tracing::debug!("Database connected ({})", dbpath);
-        Ok((Self { rx, db }, ExecutorConnection { tx }))
+        Ok((Self { rx, db }, ExecutorConnection(tx)))
     }
 
     pub fn run(mut self) {
@@ -58,7 +69,7 @@ impl DbExecutor {
             let before = Instant::now();
             tracing::debug!("got task {:?}", task);
             match task {
-                Task::AddQuote(tx, mut quote) => {
+                Task::AddQuote { tx, mut quote } => {
                     quote.author.make_ascii_lowercase();
                     let result = self
                         .db
@@ -67,24 +78,27 @@ impl DbExecutor {
                             params![quote.quote, quote.author],
                         )
                         .map(|_| ());
-                    tx.send(result).unwrap();
+                    let _e = tx.send(result);
                 }
-                Task::GetQuote(tx, author) => {
+                Task::GetQuote { tx, author } => {
                     let result = if let Some(mut author) = author {
                         author.make_ascii_lowercase();
                         self.db.query_row("select quote,username from quotes where username match ? order by random() limit 1", params![author], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
                     } else {
                         self.db.query_row("select quote,username from quotes order by random() limit 1", params![], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
                     }.optional();
-                    tx.send(result).unwrap();
+                    let _e = tx.send(result);
                 }
-                Task::StartSearch(tx, user, query, limit) => {
-                    tx.send(self.start_search(&mut searches, user, query, limit))
-                        .unwrap();
+                Task::StartSearch {
+                    tx,
+                    user,
+                    query,
+                    limit,
+                } => {
+                    let _e = tx.send(self.start_search(&mut searches, user, query, limit));
                 }
-                Task::NextSearch(tx, user, limit) => {
-                    tx.send(self.next_search(&mut searches, &user, limit))
-                        .unwrap();
+                Task::NextSearch { tx, user, limit } => {
+                    let _e = tx.send(self.next_search(&mut searches, &user, limit));
                 }
             }
             tracing::debug!(
@@ -144,66 +158,4 @@ impl DbExecutor {
         })?;
         Ok((quotes, lastoid))
     }
-}
-
-pub struct ExecutorConnection {
-    tx: UnboundedSender<Task>,
-}
-
-impl Clone for ExecutorConnection {
-    fn clone(&self) -> Self {
-        Self {
-            tx: self.tx.clone(),
-        }
-    }
-}
-
-// TODO: this is ugly, write a macro that will generate
-//       both the Task enum and the ExecutorConnection impl.
-macro_rules! executor_wrapper {
-    ($name:ident, $task:expr, $ret:ty, $($arg:ident: $ty:ty),*) => {
-        pub async fn $name(&self, $($arg: $ty),*) -> $ret {
-          let (otx, orx) = oneshot::channel();
-          self.tx.send($task(otx, $($arg),*)).unwrap();
-          orx.await.unwrap()
-        }
-    };
-    ($name:ident, $task:expr, $ret:ty) => {
-        pub async fn $name(&self) -> $ret {
-          let (otx, orx) = oneshot::channel();
-          self.tx.send($task(otx)).unwrap();
-          orx.await.unwrap()
-        }
-    };
-}
-
-impl ExecutorConnection {
-    // WARNING: these methods are NOT cancel-safe
-    executor_wrapper!(
-        add_quote,
-        Task::AddQuote,
-        rusqlite::Result<()>,
-        quote: Quote
-    );
-    executor_wrapper!(
-        get_quote,
-        Task::GetQuote,
-        rusqlite::Result<Option<Quote>>,
-        author: Option<String>
-    );
-    executor_wrapper!(
-        search_quotes,
-        Task::StartSearch,
-        rusqlite::Result<Vec<Quote>>,
-        user: String,
-        query: String,
-        limit: usize
-    );
-    executor_wrapper!(
-        advance_search,
-        Task::NextSearch,
-        rusqlite::Result<Option<Vec<Quote>>>,
-        user: String,
-        limit: usize
-    );
 }

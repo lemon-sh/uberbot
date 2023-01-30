@@ -93,7 +93,10 @@ async fn main() -> anyhow::Result<()> {
     let uber_ver = concat!("Überbot ", env!("CARGO_PKG_VERSION"));
     let nick = cfg.irc.nickname.unwrap_or_else(|| cfg.irc.username.clone());
     let irc_config = Config {
-        alt_nicks: cfg.irc.alt_nicks.unwrap_or_else(|| vec![format!("{}_", &nick), format!("{}__", &nick)]),
+        alt_nicks: cfg
+            .irc
+            .alt_nicks
+            .unwrap_or_else(|| vec![format!("{}_", &nick), format!("{}__", &nick)]),
         nickname: Some(nick),
         username: Some(cfg.irc.username.clone()),
         realname: Some(cfg.irc.username.clone()),
