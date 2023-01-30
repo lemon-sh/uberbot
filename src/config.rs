@@ -24,6 +24,7 @@ pub struct IrcConfig {
     pub tls: bool,
     pub mode: Option<String>,
     pub nickname: Option<String>,
+    pub alt_nicks: Option<Vec<String>>,
     pub port: u16,
     pub username: String,
     pub sasl_pass: Option<String>,

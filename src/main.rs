@@ -91,8 +91,10 @@ async fn main() -> anyhow::Result<()> {
     let exec_thread = thread::spawn(move || db_exec.run());
 
     let uber_ver = concat!("Überbot ", env!("CARGO_PKG_VERSION"));
+    let nick = cfg.irc.nickname.unwrap_or_else(|| cfg.irc.username.clone());
     let irc_config = Config {
-        nickname: Some(cfg.irc.nickname.unwrap_or_else(|| cfg.irc.username.clone())),
+        alt_nicks: cfg.irc.alt_nicks.unwrap_or_else(|| vec![format!("{}_", &nick), format!("{}__", &nick)]),
+        nickname: Some(nick),
         username: Some(cfg.irc.username.clone()),
         realname: Some(cfg.irc.username.clone()),
         server: Some(cfg.irc.host),

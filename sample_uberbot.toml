@@ -6,6 +6,7 @@ port = 6697
 tls = true
 username = "uberbot"
 nickname = "amazingbot"  # optional, default: same as username
+alt_nicks = ["amazingbot_"]  # optional, default: ["<nickname>_", "<nickname>__"]
 channels = ["#main", "#no-normies"]
 mode = "+B"  # optional, default: none
 sasl_pass = "1234"  # optional, does not attempt SASL PLAIN authentication by default 
