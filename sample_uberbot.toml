@@ -52,6 +52,10 @@ history_depth = 5
 # optional, default: uberbot.db3
 #db_path = "database.db3"
 
+# User agent used for title requests. Important for sites like crates.io which require
+# a user agent to be set. Default: uberbot $VERSION (reqwest)
+#user_agent = "amazingbot"
+
 # Allows disabling specific triggers in certain channels.
 # You can also disable a trigger in all channels by using '*'.
 # Currently available triggers are: sed, title, spotify

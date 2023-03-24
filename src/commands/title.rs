@@ -8,13 +8,17 @@ use reqwest::Client;
 pub struct Title {
     http: Client,
     title_regex: Regex,
+    user_agent: String,
 }
 
 impl Title {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new(user_agent: Option<String>) -> anyhow::Result<Self> {
         Ok(Title {
             http: Client::new(),
             title_regex: Regex::new(r"<title[^>]*>(.*?)</title>")?,
+            user_agent: user_agent.unwrap_or_else(|| {
+                format!("uberbot {} (reqwest)", env!("CARGO_PKG_VERSION")).to_string()
+            }),
         })
     }
 }
@@ -25,7 +29,12 @@ impl Trigger for Title {
         let url = ctx.captures.get(0).unwrap();
         tracing::debug!("url: {}", url);
 
-        let request = self.http.get(url).build()?;
+        let request = self
+            .http
+            .get(url)
+            .header("User-Agent", &self.user_agent)
+            .header("Accept", "text/html, */*")
+            .build()?;
         let response = self.http.execute(request).await?;
         let headers = response.headers();
 
