@@ -83,7 +83,7 @@ impl DbExecutor {
                 Task::GetQuote { tx, author } => {
                     let result = if let Some(mut author) = author {
                         author.make_ascii_lowercase();
-                        self.db.query_row("select quote,username from quotes where username match ? order by random() limit 1", params![author], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
+                        self.db.query_row("select quote,username from quotes where username match ? order by random() limit 1", params![format!("\"{author}\"")], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
                     } else {
                         self.db.query_row("select quote,username from quotes order by random() limit 1", params![], |v| Ok(Quote {quote:v.get(0)?, author:v.get(1)?}))
                     }.optional();
