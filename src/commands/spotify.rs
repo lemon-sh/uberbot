@@ -58,7 +58,7 @@ async fn resolve_spotify(
     match resource_type {
         "track" => {
             let track = spotify.track(TrackId::from_id(resource_id)?).await?;
-            let playtime = calculate_playtime(track.duration.as_secs());
+            let playtime = calculate_playtime(track.duration.num_seconds() as u64);
             let artists: Vec<String> = track.artists.into_iter().map(|x| x.name).collect();
             Ok(format!("\x037[Spotify]\x03 Track: \x039\"{}\"\x03 - \x039\"{}\" \x0311|\x03 Album: \x039\"{}\" \x0311|\x03 Length:\x0315 {}:{:02} \x0311|", artists.join(", "), track.name, track.album.name, playtime.0, playtime.1))
         }
@@ -77,7 +77,7 @@ async fn resolve_spotify(
                     .tracks
                     .items
                     .iter()
-                    .fold(0, |acc, x| acc + x.duration.as_secs()),
+                    .fold(0, |acc, x| acc + x.duration.num_seconds() as u64),
             );
             Ok(format!("\x037[Spotify]\x03 Album: \x039\"{}\" \x0311|\x03 Tracks:\x0315 {} \x0311|\x03 Release date:\x039 {} \x0311|\x03 Length:\x0315 {}:{:02} \x0311|", album.name, album.tracks.total, album.release_date, playtime.0, playtime.1))
         }
@@ -90,11 +90,11 @@ async fn resolve_spotify(
                 x.track.as_ref().map_or(acc, |item| match item {
                     PlayableItem::Track(t) => {
                         tracks += 1;
-                        acc + t.duration.as_secs()
+                        acc + t.duration.num_seconds() as u64
                     }
                     PlayableItem::Episode(e) => {
                         tracks += 1;
-                        acc + e.duration.as_secs()
+                        acc + e.duration.num_seconds() as u64
                     }
                 })
             }));
