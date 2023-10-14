@@ -1,5 +1,5 @@
 # überbot
-An IRC bot Above All [other bots].
+Multifunctional IRC bot
 
 ## Features
 - sed expressions
