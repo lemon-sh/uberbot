@@ -2,7 +2,7 @@ use crate::bot::{Trigger, TriggerContext};
 use async_trait::async_trait;
 use rspotify::{
     clients::BaseClient,
-    model::{AlbumId, ArtistId, PlayableItem, PlaylistId, TrackId},
+    model::{enums::misc::Market, AlbumId, ArtistId, PlayableItem, PlaylistId, TrackId},
     ClientCredsSpotify, Credentials,
 };
 
@@ -57,7 +57,9 @@ async fn resolve_spotify(
     );
     match resource_type {
         "track" => {
-            let track = spotify.track(TrackId::from_id(resource_id)?).await?;
+            let track = spotify
+                .track(TrackId::from_id(resource_id)?, Some(Market::FromToken))
+                .await?;
             let playtime = calculate_playtime(track.duration.num_seconds() as u64);
             let artists: Vec<String> = track.artists.into_iter().map(|x| x.name).collect();
             Ok(format!("\x037[Spotify]\x03 Track: \x039\"{}\"\x03 - \x039\"{}\" \x0311|\x03 Album: \x039\"{}\" \x0311|\x03 Length:\x0315 {}:{:02} \x0311|", artists.join(", "), track.name, track.album.name, playtime.0, playtime.1))
@@ -71,7 +73,9 @@ async fn resolve_spotify(
             ))
         }
         "album" => {
-            let album = spotify.album(AlbumId::from_id(resource_id)?).await?;
+            let album = spotify
+                .album(AlbumId::from_id(resource_id)?, Some(Market::FromToken))
+                .await?;
             let playtime = calculate_playtime(
                 album
                     .tracks
